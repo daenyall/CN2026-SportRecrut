@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, Alert, Modal, TextInput, Dimensions } from 'react-native';
-import { Download, Flame, CheckCircle, XCircle, Settings, X } from 'lucide-react-native';
+import { Download, Flame, CheckCircle, XCircle, ArrowLeft, Settings, X } from 'lucide-react-native';
 import { NeonCard } from '../components/NeonCard';
 import { NeonIcon } from '../components/NeonIcon';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../styles/theme';
@@ -11,6 +11,11 @@ import * as Sharing from 'expo-sharing';
 import { LineChart } from 'react-native-chart-kit';
 
 import { MOCK_STUDENTS, Athlete } from '../data/MockStudents';
+
+interface StudentProfileProps {
+  studentId?: string;
+  onClose?: () => void;
+}
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -27,7 +32,7 @@ const getBMITheme = (weight: number, height: number) => {
 // Radar Chart
 function RadarChart({ data, size = 320, themeColor = Colors.neonGreen }: { data: { attribute: string; value: number }[]; size?: number; themeColor?: string }) {
   const center = size / 2;
-  const radius = 105; 
+  const radius = 105;
   const bgRadius = 155; // Idealnie okrągłe, znacznie szersze tło na całą pajęczynę
   const angleStep = (2 * Math.PI) / data.length;
   const levels = 5;
@@ -98,7 +103,7 @@ function RadarChart({ data, size = 320, themeColor = Colors.neonGreen }: { data:
         <SvgCircle key={`dot-${i}`} cx={p.x} cy={p.y} r={5} fill={themeColor} />
       ))}
 
-      {/* Labele tekstów dopasowane do środka, nienachodzące poza obszar SVG (135) */}
+      {/* Labele tekstów dopasowane do środka */}
       {data.map((d, i) => {
         const labelPoint = getPoint(135, i);
         return (
@@ -192,10 +197,15 @@ const generatePDF = async (student: Athlete, streak: number) => {
   }
 };
 
-export default function StudentProfile() {
-  const [student, setStudent] = useState<Athlete>(MOCK_STUDENTS[0]);
+export default function StudentProfile({ studentId, onClose }: StudentProfileProps) {
+  // Inicjalizacja z połączoną logiką (znajdź wybranego lub domyślnego, wrzuć w stan)
+  const initialStudent: Athlete = studentId
+    ? MOCK_STUDENTS.find(s => s.id === studentId) || MOCK_STUDENTS[0]
+    : MOCK_STUDENTS[0];
+
+  const [student, setStudent] = useState<Athlete>(initialStudent);
   const [isEditModalVisible, setEditModalVisible] = useState(false);
-  
+
   const [editForm, setEditForm] = useState({
     weight: student.weight?.toString() || '',
     height: student.height?.toString() || '',
@@ -213,7 +223,7 @@ export default function StudentProfile() {
       useNativeDriver: true,
     }).start();
 
-    // Animacja pulsującego płomienia (buffy SVG)
+    // Animacja pulsującego płomienia
     Animated.loop(
       Animated.sequence([
         Animated.timing(flamePulse, { toValue: 1.15, duration: 800, useNativeDriver: true }),
@@ -255,7 +265,7 @@ export default function StudentProfile() {
     const newWeight = parseFloat(editForm.weight);
     const newHeight = parseFloat(editForm.height);
     const newAge = parseInt(editForm.age, 10);
-    
+
     if (isNaN(newWeight) || isNaN(newHeight) || isNaN(newAge)) {
       Alert.alert("Błąd", "Wprowadź prawidłowe liczby.");
       return;
@@ -265,7 +275,7 @@ export default function StudentProfile() {
       const updated = { ...prev, weight: newWeight, height: newHeight, age: newAge };
       if (prev.weight !== newWeight) {
         updated.weightHistory = [
-          ...prev.weightHistory,
+          ...(prev.weightHistory || []),
           { date: new Date().toISOString(), weight: newWeight }
         ];
       }
@@ -299,6 +309,11 @@ export default function StudentProfile() {
         <View style={styles.innerPadding}>
           {/* Header */}
           <View style={styles.headerRow}>
+            {onClose && (
+              <TouchableOpacity onPress={onClose} style={styles.backButton}>
+                <ArrowLeft size={24} color={Colors.white} />
+              </TouchableOpacity>
+            )}
             <View style={styles.avatarLarge}>
               <Text style={styles.avatarLargeText}>👤</Text>
             </View>
@@ -335,15 +350,15 @@ export default function StudentProfile() {
               <RadarChart data={radarData} size={320} themeColor={bmiColor} />
             </View>
           </NeonCard>
-          
-          {/* Oczyszczone Pillsy statystyk (Bez ScrollView, pozbawione błędnego Android elevation buga) */}
+
+          {/* Statystyki Pillsy */}
           <View style={styles.statsPillsContainer}>
             {statsArray.map((stat, idx) => {
               const isBest = stat.value === maxStat;
               const isWorst = stat.value === minStat;
-              return ( 
-                <View 
-                  key={stat.label + idx} 
+              return (
+                <View
+                  key={stat.label + idx}
                   style={[
                     styles.statPillModern,
                     isBest && styles.statPillBest,
@@ -362,7 +377,7 @@ export default function StudentProfile() {
               );
             })}
           </View>
-          
+
           {/* Wykres Progresu Wagi */}
           <View style={styles.sectionSpacing}>
             <Text style={styles.sectionTitle}>⚖️ Progres Wagi</Text>
@@ -370,41 +385,41 @@ export default function StudentProfile() {
               <View style={{ overflow: 'hidden', paddingVertical: Spacing.md, marginLeft: -20 }}>
                 {student.weightHistory?.length > 0 ? (
                   <LineChart
-                      data={{
-                        labels: student.weightHistory.map(w => new Date(w.date).toLocaleDateString(undefined, { month: 'short' })),
-                        datasets: [
-                          {
-                            data: student.weightHistory.map(w => w.weight)
-                          }
-                        ]
-                      }}
-                      width={screenWidth - Spacing.xl * 2 + 10}
-                      height={220}
-                      yAxisSuffix="kg"
-                      chartConfig={{
-                        backgroundColor: "transparent",
-                        backgroundGradientFrom: "transparent",
-                        backgroundGradientFromOpacity: 0,
-                        backgroundGradientTo: "transparent",
-                        backgroundGradientToOpacity: 0,
-                        decimalPlaces: 1,
-                        color: (opacity = 1) => bmiColor,
-                        labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-                        style: {
-                          borderRadius: 16
-                        },
-                        propsForDots: {
-                          r: "4",
-                          strokeWidth: "2",
-                          stroke: bmiColor
+                    data={{
+                      labels: student.weightHistory.map(w => new Date(w.date).toLocaleDateString(undefined, { month: 'short' })),
+                      datasets: [
+                        {
+                          data: student.weightHistory.map(w => w.weight)
                         }
-                      }}
-                      bezier
-                      style={{
-                        marginVertical: 8,
+                      ]
+                    }}
+                    width={screenWidth - Spacing.xl * 2 + 10}
+                    height={220}
+                    yAxisSuffix="kg"
+                    chartConfig={{
+                      backgroundColor: "transparent",
+                      backgroundGradientFrom: "transparent",
+                      backgroundGradientFromOpacity: 0,
+                      backgroundGradientTo: "transparent",
+                      backgroundGradientToOpacity: 0,
+                      decimalPlaces: 1,
+                      color: (opacity = 1) => bmiColor,
+                      labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+                      style: {
                         borderRadius: 16
-                      }}
-                    />
+                      },
+                      propsForDots: {
+                        r: "4",
+                        strokeWidth: "2",
+                        stroke: bmiColor
+                      }
+                    }}
+                    bezier
+                    style={{
+                      marginVertical: 8,
+                      borderRadius: 16
+                    }}
+                  />
                 ) : (
                   <Text style={{ textAlign: 'center', color: Colors.gray }}>Brak danych wagi.</Text>
                 )}
@@ -412,7 +427,7 @@ export default function StudentProfile() {
             </NeonCard>
           </View>
 
-          {/* Streak Badge (używamy animowanego ikonki streaka tak jak overalla) */}
+          {/* Streak Badge */}
           <View style={styles.sectionSpacing}>
             <NeonCard>
               <View style={styles.streakBadge}>
@@ -444,14 +459,14 @@ export default function StudentProfile() {
               <NeonCard>
                 <View style={styles.badgeContent}>
                   {student.avatar !== 'default.png' ? (
-                     <LottieView
-                       source={require('../../../assets/lottie/tick.json')}
-                       autoPlay
-                       loop
-                       style={{ width: 24, height: 24, marginRight: Spacing.sm }}
-                     />
+                    <LottieView
+                      source={require('../../../assets/lottie/tick.json')}
+                      autoPlay
+                      loop
+                      style={{ width: 24, height: 24, marginRight: Spacing.sm }}
+                    />
                   ) : (
-                     <XCircle size={24} color={Colors.red} style={{ marginRight: Spacing.sm }} />
+                    <XCircle size={24} color={Colors.red} style={{ marginRight: Spacing.sm }} />
                   )}
                   <View>
                     <Text style={[styles.badgeTitleGreen, student.avatar === 'default.png' && { color: Colors.red }]}>
@@ -466,39 +481,39 @@ export default function StudentProfile() {
             </View>
           </View>
 
-          {/* Nowa sekcja: Osiągnięcia */}
+          {/* Osiągnięcia */}
           <View style={styles.sectionSpacing}>
             <Text style={styles.sectionTitle}>🏆 Osiągnięcia</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
-               {student.recentAchievements.map((ach: any) => (
-                 <View key={ach.id} style={styles.achievementCard}>
-                   <Text style={styles.achievementIcon}>{ach.icon}</Text>
-                   <Text style={styles.achievementTitle} numberOfLines={2}>{ach.title}</Text>
-                   <Text style={styles.achievementDate}>{new Date(ach.date).toLocaleDateString()}</Text>
-                 </View>
-               ))}
+              {student.recentAchievements.map((ach: any) => (
+                <View key={ach.id} style={styles.achievementCard}>
+                  <Text style={styles.achievementIcon}>{ach.icon}</Text>
+                  <Text style={styles.achievementTitle} numberOfLines={2}>{ach.title}</Text>
+                  <Text style={styles.achievementDate}>{new Date(ach.date).toLocaleDateString()}</Text>
+                </View>
+              ))}
             </ScrollView>
           </View>
 
-          {/* Nowa sekcja: Ostatnie Ćwiczenia */}
+          {/* Ostatnie Ćwiczenia */}
           <View style={styles.sectionSpacing}>
             <Text style={styles.sectionTitle}>📈 Ostatnie Ćwiczenia</Text>
             <View style={styles.exercisesList}>
-               {student.recentExercises.map((ex: any) => (
-                 <View key={ex.id} style={styles.exerciseCard}>
-                   <View style={styles.exerciseInfo}>
-                      <Text style={styles.exerciseName}>{ex.name}</Text>
-                      <Text style={styles.exerciseDate}>{new Date(ex.date).toLocaleDateString()}</Text>
-                   </View>
-                   <Text style={styles.exerciseScore}>{ex.score} pkt</Text>
-                 </View>
-               ))}
+              {student.recentExercises.map((ex: any) => (
+                <View key={ex.id} style={styles.exerciseCard}>
+                  <View style={styles.exerciseInfo}>
+                    <Text style={styles.exerciseName}>{ex.name}</Text>
+                    <Text style={styles.exerciseDate}>{new Date(ex.date).toLocaleDateString()}</Text>
+                  </View>
+                  <Text style={styles.exerciseScore}>{ex.score} pkt</Text>
+                </View>
+              ))}
             </View>
           </View>
 
-          {/* Przycisk Pobierz PDF (Animowana Biegająca Ramka) */}
-          <TouchableOpacity 
-            style={styles.downloadButtonWrapper} 
+          {/* Przycisk Pobierz PDF */}
+          <TouchableOpacity
+            style={styles.downloadButtonWrapper}
             activeOpacity={0.8}
             onPress={() => generatePDF(student, currentStreakValue)}
           >
@@ -580,6 +595,10 @@ const styles = StyleSheet.create({
     padding: Spacing.xl,
     paddingTop: 60,
   },
+  backButton: {
+    padding: Spacing.sm,
+    marginRight: Spacing.xs,
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -615,16 +634,6 @@ const styles = StyleSheet.create({
     color: Colors.gray,
     fontSize: FontSize.base,
   },
-  schoolBadge: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: Colors.cardBg,
-    borderWidth: 2,
-    borderColor: Colors.neonGreen,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   settingsButton: {
     width: 48,
     height: 48,
@@ -640,7 +649,6 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
     paddingTop: Spacing.md,
   },
-  // Flame Overalls
   flameWrapper: {
     width: 140,
     height: 140,
@@ -661,13 +669,12 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 8,
     zIndex: 2,
-    marginTop: 25, 
+    marginTop: 25,
   },
   chartContainer: {
     alignItems: 'center',
     paddingVertical: Spacing.lg,
   },
-  // FIXED STATS PILLS (No scroll, fitted to screen, no shadow bugs)
   statsPillsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -688,7 +695,6 @@ const styles = StyleSheet.create({
   statPillBest: {
     borderColor: Colors.neonGreen,
     backgroundColor: 'rgba(0, 230, 118, 0.15)',
-    // Usunięto shadowColor/elevation aby zlikwidować ciemny wirtualny kwadrat na obrysie!
   },
   statPillWorst: {
     borderColor: Colors.orange,
@@ -696,7 +702,7 @@ const styles = StyleSheet.create({
   },
   statPillLabel: {
     color: Colors.white,
-    fontSize: 11, // Smaller to fit 5 items comfortably
+    fontSize: 11,
     marginBottom: 4,
     opacity: 0.8,
   },
@@ -708,7 +714,6 @@ const styles = StyleSheet.create({
   sectionSpacing: {
     marginTop: Spacing.xl,
   },
-  // STREAK & BADGES
   streakBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -766,7 +771,6 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     marginTop: 2,
   },
-  // NOWE: Achievements & Exercises
   sectionTitle: {
     color: Colors.white,
     fontSize: FontSize.xl,
@@ -835,7 +839,6 @@ const styles = StyleSheet.create({
     fontSize: FontSize.lg,
     fontWeight: '800',
   },
-  // Download button
   downloadButtonWrapper: {
     width: '100%',
     height: 56,
@@ -869,25 +872,25 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontSize: FontSize.md,
   },
-  modalOverlay: { 
-    flex: 1, 
-    backgroundColor: 'rgba(0,0,0,0.8)', 
-    justifyContent: 'flex-end' 
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'flex-end'
   },
-  modalContent: { 
-    backgroundColor: Colors.bgDeep, 
-    borderTopLeftRadius: 20, 
-    borderTopRightRadius: 20, 
-    padding: Spacing.xl, 
+  modalContent: {
+    backgroundColor: Colors.bgDeep,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: Spacing.xl,
     paddingBottom: Spacing.xxl,
-    borderWidth: 1, 
-    borderColor: 'rgba(255,255,255,0.1)' 
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)'
   },
-  modalHeader: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    marginBottom: Spacing.xl 
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xl
   },
   inputGroup: {
     marginBottom: Spacing.lg
