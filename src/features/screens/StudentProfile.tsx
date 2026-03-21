@@ -323,6 +323,84 @@ Odpowiedz DOKŁADNIE w 4 punktach (po polsku):
     { attribute: 'Zwinność', value: agility },
   ];
 
+  const generatePDF = async () => {
+    try {
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html lang="pl">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Paszport Sportowy</title>
+          <style>
+            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f6f8; color: #333; margin: 0; padding: 40px; }
+            .container { background-color: #fff; padding: 40px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); max-width: 800px; margin: auto; }
+            .header { text-align: center; border-bottom: 2px solid #00E676; padding-bottom: 20px; margin-bottom: 30px; }
+            .header h1 { margin: 0; color: #1E2A3A; font-size: 32px; text-transform: uppercase; letter-spacing: 2px; }
+            .header p { color: #00E676; font-size: 16px; font-weight: bold; margin: 10px 0 0; }
+            .section { margin-bottom: 30px; }
+            .section-title { font-size: 20px; color: #1E2A3A; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px; }
+            .info-grid { display: flex; flex-wrap: wrap; gap: 20px; }
+            .info-item { flex: 1 1 calc(50% - 20px); background: #f9fbfd; padding: 15px; border-radius: 8px; border-left: 4px solid #00E676; }
+            .info-label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+            .info-value { font-size: 18px; color: #1E2A3A; font-weight: bold; }
+            .stats-grid { display: flex; flex-wrap: wrap; gap: 15px; }
+            .stat-card { flex: 1 1 calc(33.333% - 15px); background: #1E2A3A; color: #fff; text-align: center; padding: 20px; border-radius: 12px; }
+            .stat-value { font-size: 28px; font-weight: bold; color: #00E676; margin-bottom: 5px; }
+            .stat-label { font-size: 12px; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
+            .overall-card { background: linear-gradient(135deg, #00E676, #00B359); color: #fff; text-align: center; padding: 30px; border-radius: 12px; margin-top: 20px; box-shadow: 0 4px 15px rgba(0,230,118,0.3); }
+            .overall-value { font-size: 48px; font-weight: 900; margin: 0; }
+            .overall-label { font-size: 16px; text-transform: uppercase; letter-spacing: 2px; opacity: 0.9; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Paszport Sportowy</h1>
+              <p>Raport Wyników Zawodnika</p>
+            </div>
+            
+            <div class="section">
+              <div class="section-title">Profil Zawodnika</div>
+              <div class="info-grid">
+                <div class="info-item"><div class="info-label">Imię i Nazwisko</div><div class="info-value">${student.name}</div></div>
+                <div class="info-item"><div class="info-label">Klasa/Grupa</div><div class="info-value">${student.class || '-'}</div></div>
+                <div class="info-item"><div class="info-label">Wiek</div><div class="info-value">${student.age || '-'} lat</div></div>
+                <div class="info-item"><div class="info-label">Waga / Wzrost</div><div class="info-value">${student.weight || '-'} kg / ${student.height || '-'} cm</div></div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">Parametry Motoryczne</div>
+              <div class="stats-grid">
+                <div class="stat-card"><div class="stat-value">${speed}</div><div class="stat-label">Szybkość</div></div>
+                <div class="stat-card"><div class="stat-value">${strength}</div><div class="stat-label">Siła</div></div>
+                <div class="stat-card"><div class="stat-value">${stamina}</div><div class="stat-label">Wytrzymałość</div></div>
+                <div class="stat-card"><div class="stat-value">${jump}</div><div class="stat-label">Skoczność</div></div>
+                <div class="stat-card"><div class="stat-value">${agility}</div><div class="stat-label">Zwinność</div></div>
+              </div>
+              
+              <div class="overall-card">
+                <div class="overall-value">${dynamicOverall}</div>
+                <div class="overall-label">Ocena Ogólna (OVR)</div>
+              </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 40px; color: #888; font-size: 12px;">
+              Dokument wygenerowany wirtualnie z systemu skautingu. Wyniki mogą ulec zmianie w czasie.
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+      const { uri } = await Print.printToFileAsync({ html: htmlContent });
+      await Sharing.shareAsync(uri, { dialogTitle: 'Pobierz Paszport PDF' });
+    } catch (error) {
+      console.error('Błąd generowania PDF:', error);
+      Alert.alert('Błąd', 'Nie udało się wygenerować dokumentu PDF.');
+    }
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -399,7 +477,7 @@ Odpowiedz DOKŁADNIE w 4 punktach (po polsku):
             </NeonCard>
           </View>
 
-          <TouchableOpacity style={styles.downloadButtonWrapper} activeOpacity={0.8} onPress={() => Alert.alert("Generowanie...", "Twój paszport PDF jest przygotowywany.")}>
+          <TouchableOpacity style={styles.downloadButtonWrapper} activeOpacity={0.8} onPress={generatePDF}>
             <Animated.View style={[styles.rotatingBorder, { transform: [{ rotate: spin }] }]} />
             <View style={styles.downloadButtonInner}>
               <Download size={20} color={Colors.white} />
@@ -450,6 +528,7 @@ Odpowiedz DOKŁADNIE w 4 punktach (po polsku):
             </View>
             <View style={styles.inputGroup}><Text style={styles.label}>Wzrost (cm)</Text><TextInput style={styles.input} value={editForm.height} onChangeText={v => setEditForm(p => ({ ...p, height: v }))} keyboardType="numeric" placeholderTextColor={Colors.gray} /></View>
             <View style={styles.inputGroup}><Text style={styles.label}>Waga (kg)</Text><TextInput style={styles.input} value={editForm.weight} onChangeText={v => setEditForm(p => ({ ...p, weight: v }))} keyboardType="decimal-pad" placeholderTextColor={Colors.gray} /></View>
+            <View style={styles.inputGroup}><Text style={styles.label}>Wiek (lata)</Text><TextInput style={styles.input} value={editForm.age} onChangeText={v => setEditForm(p => ({ ...p, age: v }))} keyboardType="numeric" placeholderTextColor={Colors.gray} /></View>
             <TouchableOpacity style={styles.saveBtn} onPress={handleSaveProfile}><Text style={styles.saveBtnText}>ZAPISZ</Text></TouchableOpacity>
           </View>
         </View>
