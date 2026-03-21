@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, Alert, Modal, TextInput, Dimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, Alert, Modal, TextInput, Dimensions, Image } from 'react-native';
 import { Download, Flame, CheckCircle, XCircle, ArrowLeft, Settings, X } from 'lucide-react-native';
 import { NeonCard } from '../components/NeonCard';
 import { NeonIcon } from '../components/NeonIcon';
@@ -329,7 +329,11 @@ export default function StudentProfile({ studentId, onClose }: StudentProfilePro
               </TouchableOpacity>
             )}
             <View style={styles.avatarLarge}>
-              <Text style={styles.avatarLargeText}>👤</Text>
+              {student.avatar && student.avatar.startsWith('http') ? (
+                <Image source={{ uri: student.avatar }} style={styles.avatarImage} />
+              ) : (
+                <Text style={styles.avatarLargeText}>👤</Text>
+              )}
             </View>
             <View style={styles.headerInfo}>
               <Text style={styles.headerName}>{student.name}</Text>
@@ -645,6 +649,11 @@ const styles = StyleSheet.create({
   },
   avatarLargeText: {
     fontSize: 36,
+  },
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
   },
   headerInfo: {
     flex: 1,

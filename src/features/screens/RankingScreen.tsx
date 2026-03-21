@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { Medal, TrendingUp, TrendingDown, Flame } from 'lucide-react-native';
 import { NeonCard } from '../components/NeonCard';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../styles/theme';
+import { MOCK_STUDENTS } from '../data/MockStudents';
 
 export default function RankingScreen() {
   const [activeTab, setActiveTab] = useState<'week' | 'month' | 'all'>('week');
@@ -62,6 +63,7 @@ export default function RankingScreen() {
             {rankings.map((player) => {
               const medalColor = getMedalColor(player.rank);
               const isFirst = player.rank === 1;
+              const matchingStudent = MOCK_STUDENTS.find(s => s.name === player.name);
 
               return (
                 <NeonCard
@@ -95,9 +97,14 @@ export default function RankingScreen() {
                       style={[
                         styles.rankAvatar,
                         isFirst && styles.rankAvatarFirst,
+                        { overflow: 'hidden', padding: 0 }
                       ]}
                     >
-                      <Text style={{ fontSize: isFirst ? 20 : 16 }}>👤</Text>
+                      {matchingStudent?.avatar && matchingStudent.avatar.startsWith('http') ? (
+                        <Image source={{ uri: matchingStudent.avatar }} style={{ width: '100%', height: '100%' }} />
+                      ) : (
+                        <Text style={{ fontSize: isFirst ? 20 : 16 }}>👤</Text>
+                      )}
                     </View>
 
                     {/* Name & Class */}

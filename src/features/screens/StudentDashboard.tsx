@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, Image } from 'react-native';
 import { BarChart3, Play, Trophy, Map, Flame, Gift } from 'lucide-react-native';
 import { useNavigation, CompositeNavigationProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -9,12 +9,15 @@ import { NeonIcon } from '../components/NeonIcon';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../styles/theme';
 import type { RootStackParamList, StudentTabParamList } from '../routes';
 
+import { MOCK_STUDENTS } from '../data/MockStudents';
+
 type DashboardNavProp = CompositeNavigationProp<
   MaterialTopTabNavigationProp<StudentTabParamList, 'StudentDashboard'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 
 export default function StudentDashboard() {
+  const student = MOCK_STUDENTS[0];
   const navigation = useNavigation<DashboardNavProp>();
 
   const headerOpacity = useRef(new Animated.Value(0)).current;
@@ -59,7 +62,7 @@ export default function StudentDashboard() {
           <Animated.View
             style={{ opacity: headerOpacity, transform: [{ translateX: headerTranslateX }] }}
           >
-            <Text style={styles.headerTitle}>Cześć, Jakub! 👋</Text>
+            <Text style={styles.headerTitle}>Cześć, {student.name.split(' ')[0]}! 👋</Text>
           </Animated.View>
           <Animated.View
             style={[
@@ -71,10 +74,16 @@ export default function StudentDashboard() {
                 shadowOpacity: 0.4,
                 shadowRadius: 10,
                 elevation: 6,
+                padding: 0,
+                overflow: 'hidden'
               },
             ]}
           >
-            <Text style={styles.avatarText}>👤</Text>
+            {student.avatar && student.avatar.startsWith('http') ? (
+              <Image source={{ uri: student.avatar }} style={{ width: '100%', height: '100%' }} />
+            ) : (
+              <Text style={styles.avatarText}>👤</Text>
+            )}
           </Animated.View>
         </View>
 
