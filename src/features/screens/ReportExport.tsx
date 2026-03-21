@@ -12,6 +12,7 @@ import { collection, getDocs, getDoc, doc } from 'firebase/firestore';
 
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as MailComposer from 'expo-mail-composer';
 
 import { EXERCISES } from '../config/exercises';
 import { calculateDynamicStats } from '../utils/rankCalculator';
@@ -109,6 +110,215 @@ export default function ReportExport() {
     fetchReportData();
   }, []);
 
+  const generateHtmlReport = () => {
+    let tableRows = '';
+      
+    const sortedStudents = [...studentsList].sort((a, b) => (b.overall || 0) - (a.overall || 0));
+    
+    sortedStudents.forEach((student, index) => {
+      const getBest = (exId: string) => {
+        const results = student.testResults || [];
+        let best: number | null = null;
+        const isLower = EXERCISES.find(e => e.id === exId)?.scoring === 'lower';
+        
+        results.forEach((test: any) => {
+          const ex = test.exercises?.find((e: any) => e.exerciseId === exId);
+          if (ex && ex.bestValue > 0) {
+            if (best === null) best = ex.bestValue;
+            else if (isLower) best = Math.min(best, ex.bestValue);
+            else best = Math.max(best, ex.bestValue);
+          }
+        });
+        return best !== null ? best : '-';
+      };
+
+      tableRows += `
+        <tr>
+          <td style="padding: 12px; border-bottom: 1px dashed var(--color-border); font-size: 15px;">${index + 1}</td>
+          <td style="padding: 12px; border-bottom: 1px dashed var(--color-border); font-size: 15px; font-weight: 600;">${student.name || student.email || 'Brak danych'}</td>
+          <td style="padding: 12px; border-bottom: 1px dashed var(--color-border); font-size: 15px; text-align: center; color: var(--color-primary); font-weight: bold;">${getBest('plank')}</td>
+          <td style="padding: 12px; border-bottom: 1px dashed var(--color-border); font-size: 15px; text-align: center; color: var(--color-primary); font-weight: bold;">${getBest('run100')}</td>
+          <td style="padding: 12px; border-bottom: 1px dashed var(--color-border); font-size: 15px; text-align: center; color: var(--color-primary); font-weight: bold;">${getBest('jump')}</td>
+          <td style="padding: 12px; border-bottom: 1px dashed var(--color-border); font-size: 15px; text-align: center; font-weight: 800; color: #0F172A;">${student.overall || 0} OVR</td>
+        </tr>
+      `;
+    });
+
+    const today = new Date().toLocaleDateString('pl-PL');
+
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,600;0,700;0,800;1,400&display=swap');
+            :root {
+              --color-bg: #FFFFFF;
+              --color-text: #0F172A;
+              --color-primary: #059669;
+              --color-light-gray: #F8FAFC;
+              --color-border: #E2E8F0;
+              --font-family: 'Montserrat', sans-serif;
+            }
+            body {
+              margin: 0;
+              padding: 40px;
+              font-family: var(--font-family);
+              background-color: var(--color-bg);
+              color: var(--color-text);
+              -webkit-print-color-adjust: exact;
+            }
+            .header {
+              border-bottom: 2px solid var(--color-primary);
+              padding-bottom: 20px;
+              margin-bottom: 40px;
+              text-align: center;
+            }
+            h1 { font-size: 32px; font-weight: 800; margin: 0; color: var(--color-text); text-transform: uppercase; letter-spacing: 1px; }
+            .school-name { font-size: 18px; color: #475569; margin-top: 8px; font-weight: 600; }
+            .date { font-size: 14px; color: #64748B; margin-top: 4px; }
+            
+            .stats-grid {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 40px;
+              gap: 20px;
+            }
+            .stat-card {
+              flex: 1;
+              background-color: var(--color-light-gray);
+              border: 1px solid var(--color-border);
+              border-radius: 12px;
+              padding: 24px;
+              text-align: center;
+            }
+            .stat-val { font-size: 36px; font-weight: 800; color: var(--color-primary); margin-bottom: 8px; }
+            .stat-label { font-size: 14px; font-weight: 600; color: #475569; text-transform: uppercase; }
+            
+            .content-section {
+              margin-bottom: 30px;
+            }
+            .section-title {
+              font-size: 20px;
+              font-weight: 700;
+              margin-bottom: 15px;
+              color: var(--color-text);
+              border-bottom: 1px solid var(--color-border);
+              padding-bottom: 8px;
+            }
+            ul { list-style-type: none; padding: 0; margin: 0; }
+            li { padding: 12px 0; border-bottom: 1px dashed var(--color-border); font-size: 16px; color: #334155; }
+            li::before {
+              content: "■";
+              color: var(--color-primary);
+              font-weight: bold;
+              margin-right: 12px;
+              font-size: 12px;
+            }
+            li:last-child {
+              border-bottom: none;
+            }
+            
+            .signatures {
+              margin-top: 80px;
+              display: flex;
+              justify-content: space-between;
+            }
+            .signature-box {
+              text-align: center;
+              width: 45%;
+            }
+            .signature-line {
+              border-bottom: 1px solid var(--color-text);
+              margin-bottom: 10px;
+              height: 40px;
+            }
+            .signature-label {
+              font-size: 14px;
+              font-weight: 600;
+              color: #64748B;
+            }
+
+            .footer {
+              margin-top: 60px;
+              font-size: 10px;
+              text-align: center;
+              color: #94A3B8;
+              border-top: 1px solid var(--color-border);
+              padding-top: 20px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Raport Ewaluacyjny</h1>
+            <div class="school-name">${teacherSchool}</div>
+            <div class="date">Wydruk z dnia: ${today}</div>
+          </div>
+          
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-val">${totalStudents}</div>
+              <div class="stat-label">Aktywnych Uczniów</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-val">${averageScore}</div>
+              <div class="stat-label">Średni Wynik OVR</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-val">${totalStreaks}</div>
+              <div class="stat-label">Systematycznych</div>
+            </div>
+          </div>
+          <div class="content-section">
+            <div class="section-title">Wyniki Uczniów (${totalStudents})</div>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+              <thead>
+                <tr style="background-color: var(--color-light-gray); border-bottom: 2px solid var(--color-border);">
+                  <th style="padding: 12px; text-align: left; font-size: 14px; color: #475569;">#</th>
+                  <th style="padding: 12px; text-align: left; font-size: 14px; color: #475569;">Imię i Nazwisko</th>
+                  <th style="padding: 12px; text-align: center; font-size: 14px; color: #475569;">Plank (s)</th>
+                  <th style="padding: 12px; text-align: center; font-size: 14px; color: #475569;">100m (s)</th>
+                  <th style="padding: 12px; text-align: center; font-size: 14px; color: #475569;">Skok w dal (cm)</th>
+                  <th style="padding: 12px; text-align: center; font-size: 14px; color: #475569;">OVR</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${tableRows}
+              </tbody>
+            </table>
+          </div>
+          <div class="content-section">
+            <div class="section-title">Podsumowanie Placówki</div>
+            <p style="color: #475569; line-height: 1.6; font-size: 15px;">Powyższy raport przedstawia zbiorcze podsumowanie aktywności sportowej uczniów analizowanej szkoły na platformie <strong>SportRecrut</strong>. Algorytmy sztucznej inteligencji zweryfikowały postępy na podstawie wprowadzonych ćwiczeń oraz przeprowadzonych sprawdzianów terenowych.</p>
+            <ul>
+              <li><strong>Wiarygodność Danych:</strong> Rzetelna - wyniki zostały zatwierdzone przez Nauczyciela.</li>
+              <li><strong>Frekwencja Aktywna:</strong> ${totalStudents > 0 ? Math.round((totalStreaks / totalStudents) * 100) : 0}% uczniów regularnie realizuje zalecenia AI.</li>
+              <li><strong>Poziom Sportowy Szkoły:</strong> ${averageScore >= 75 ? 'Wysoki OVR (>75)' : averageScore >= 55 ? 'Średni OVR (55-75)' : 'Rozwojowy OVR (<55)'}</li>
+            </ul>
+          </div>
+          
+          <div class="signatures">
+            <div class="signature-box">
+              <div class="signature-line"></div>
+              <div class="signature-label">Podpis Koordynatora / Nauczyciela</div>
+            </div>
+            <div class="signature-box">
+              <div class="signature-line"></div>
+              <div class="signature-label">Podpis Dyrektora Placówki (Opcjonalnie)</div>
+            </div>
+          </div>
+
+          <div class="footer">
+            Dokument wygenerowany weryfikatów z systemu SportRecrut. Opatrzony automatycznie.<br>
+            Identyfikator dokumentu: SR-${Math.random().toString(36).substr(2, 9).toUpperCase()}-${Date.now()}
+          </div>
+        </body>
+      </html>
+    `;
+  };
+
   const handleGeneratePDF = async () => {
     if (totalStudents === 0) {
       Alert.alert('Brak danych', 'Nie masz jeszcze uczniów w swojej placówce. Raport byłby pusty!');
@@ -116,210 +326,7 @@ export default function ReportExport() {
     }
 
     try {
-      let tableRows = '';
-      
-      const sortedStudents = [...studentsList].sort((a, b) => (b.overall || 0) - (a.overall || 0));
-      
-      sortedStudents.forEach((student, index) => {
-        const getBest = (exId: string) => {
-          const results = student.testResults || [];
-          let best: number | null = null;
-          const isLower = EXERCISES.find(e => e.id === exId)?.scoring === 'lower';
-          
-          results.forEach((test: any) => {
-            const ex = test.exercises?.find((e: any) => e.exerciseId === exId);
-            if (ex && ex.bestValue > 0) {
-              if (best === null) best = ex.bestValue;
-              else if (isLower) best = Math.min(best, ex.bestValue);
-              else best = Math.max(best, ex.bestValue);
-            }
-          });
-          return best !== null ? best : '-';
-        };
-
-        tableRows += `
-          <tr>
-            <td style="padding: 12px; border-bottom: 1px dashed var(--color-border); font-size: 15px;">${index + 1}</td>
-            <td style="padding: 12px; border-bottom: 1px dashed var(--color-border); font-size: 15px; font-weight: 600;">${student.name || student.email || 'Brak danych'}</td>
-            <td style="padding: 12px; border-bottom: 1px dashed var(--color-border); font-size: 15px; text-align: center; color: var(--color-primary); font-weight: bold;">${getBest('plank')}</td>
-            <td style="padding: 12px; border-bottom: 1px dashed var(--color-border); font-size: 15px; text-align: center; color: var(--color-primary); font-weight: bold;">${getBest('run100')}</td>
-            <td style="padding: 12px; border-bottom: 1px dashed var(--color-border); font-size: 15px; text-align: center; color: var(--color-primary); font-weight: bold;">${getBest('jump')}</td>
-            <td style="padding: 12px; border-bottom: 1px dashed var(--color-border); font-size: 15px; text-align: center; font-weight: 800; color: #0F172A;">${student.overall || 0} OVR</td>
-          </tr>
-        `;
-      });
-
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
-            <style>
-              @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,600;0,700;0,800;1,400&display=swap');
-              :root {
-                --color-bg: #FFFFFF;
-                --color-text: #0F172A;
-                --color-primary: #059669;
-                --color-light-gray: #F8FAFC;
-                --color-border: #E2E8F0;
-                --font-family: 'Montserrat', sans-serif;
-              }
-              body {
-                margin: 0;
-                padding: 40px;
-                font-family: var(--font-family);
-                background-color: var(--color-bg);
-                color: var(--color-text);
-                -webkit-print-color-adjust: exact;
-              }
-              .header {
-                border-bottom: 2px solid var(--color-primary);
-                padding-bottom: 20px;
-                margin-bottom: 40px;
-                text-align: center;
-              }
-              h1 { font-size: 32px; font-weight: 800; margin: 0; color: var(--color-text); text-transform: uppercase; letter-spacing: 1px; }
-              .school-name { font-size: 18px; color: #475569; margin-top: 8px; font-weight: 600; }
-              .date { font-size: 14px; color: #64748B; margin-top: 4px; }
-              
-              .stats-grid {
-                display: flex;
-                justify-content: space-between;
-                margin-bottom: 40px;
-                gap: 20px;
-              }
-              .stat-card {
-                flex: 1;
-                background-color: var(--color-light-gray);
-                border: 1px solid var(--color-border);
-                border-radius: 12px;
-                padding: 24px;
-                text-align: center;
-              }
-              .stat-val { font-size: 36px; font-weight: 800; color: var(--color-primary); margin-bottom: 8px; }
-              .stat-label { font-size: 14px; font-weight: 600; color: #475569; text-transform: uppercase; }
-              
-              .content-section {
-                margin-bottom: 30px;
-              }
-              .section-title {
-                font-size: 20px;
-                font-weight: 700;
-                margin-bottom: 15px;
-                color: var(--color-text);
-                border-bottom: 1px solid var(--color-border);
-                padding-bottom: 8px;
-              }
-              ul { list-style-type: none; padding: 0; margin: 0; }
-              li { padding: 12px 0; border-bottom: 1px dashed var(--color-border); font-size: 16px; color: #334155; }
-              li::before {
-                content: "■";
-                color: var(--color-primary);
-                font-weight: bold;
-                margin-right: 12px;
-                font-size: 12px;
-              }
-              li:last-child {
-                border-bottom: none;
-              }
-              
-              .signatures {
-                margin-top: 80px;
-                display: flex;
-                justify-content: space-between;
-              }
-              .signature-box {
-                text-align: center;
-                width: 45%;
-              }
-              .signature-line {
-                border-bottom: 1px solid var(--color-text);
-                margin-bottom: 10px;
-                height: 40px;
-              }
-              .signature-label {
-                font-size: 14px;
-                font-weight: 600;
-                color: #64748B;
-              }
-
-              .footer {
-                margin-top: 60px;
-                font-size: 10px;
-                text-align: center;
-                color: #94A3B8;
-                border-top: 1px solid var(--color-border);
-                padding-top: 20px;
-              }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <h1>Raport Ewaluacyjny</h1>
-              <div class="school-name">${teacherSchool}</div>
-              <div class="date">Wydruk z dnia: ${today}</div>
-            </div>
-            
-            <div class="stats-grid">
-              <div class="stat-card">
-                <div class="stat-val">${totalStudents}</div>
-                <div class="stat-label">Aktywnych Uczniów</div>
-              </div>
-              <div class="stat-card">
-                <div class="stat-val">${averageScore}</div>
-                <div class="stat-label">Średni Wynik OVR</div>
-              </div>
-              <div class="stat-card">
-                <div class="stat-val">${totalStreaks}</div>
-                <div class="stat-label">Systematycznych</div>
-              </div>
-            </div>
-            <div class="content-section">
-              <div class="section-title">Wyniki Uczniów (${totalStudents})</div>
-              <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
-                <thead>
-                  <tr style="background-color: var(--color-light-gray); border-bottom: 2px solid var(--color-border);">
-                    <th style="padding: 12px; text-align: left; font-size: 14px; color: #475569;">#</th>
-                    <th style="padding: 12px; text-align: left; font-size: 14px; color: #475569;">Imię i Nazwisko</th>
-                    <th style="padding: 12px; text-align: center; font-size: 14px; color: #475569;">Plank (s)</th>
-                    <th style="padding: 12px; text-align: center; font-size: 14px; color: #475569;">100m (s)</th>
-                    <th style="padding: 12px; text-align: center; font-size: 14px; color: #475569;">Skok w dal (cm)</th>
-                    <th style="padding: 12px; text-align: center; font-size: 14px; color: #475569;">OVR</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${tableRows}
-                </tbody>
-              </table>
-            </div>
-            <div class="content-section">
-              <div class="section-title">Podsumowanie Placówki</div>
-              <p style="color: #475569; line-height: 1.6; font-size: 15px;">Powyższy raport przedstawia zbiorcze podsumowanie aktywności sportowej uczniów analizowanej szkoły na platformie <strong>SportRecrut</strong>. Algorytmy sztucznej inteligencji zweryfikowały postępy na podstawie wprowadzonych ćwiczeń oraz przeprowadzonych sprawdzianów terenowych.</p>
-              <ul>
-                <li><strong>Wiarygodność Danych:</strong> Rzetelna - wyniki zostały zatwierdzone przez Nauczyciela.</li>
-                <li><strong>Frekwencja Aktywna:</strong> ${totalStudents > 0 ? Math.round((totalStreaks / totalStudents) * 100) : 0}% uczniów regularnie realizuje zalecenia AI.</li>
-                <li><strong>Poziom Sportowy Szkoły:</strong> ${averageScore >= 75 ? 'Wysoki OVR (>75)' : averageScore >= 55 ? 'Średni OVR (55-75)' : 'Rozwojowy OVR (<55)'}</li>
-              </ul>
-            </div>
-            
-            <div class="signatures">
-              <div class="signature-box">
-                <div class="signature-line"></div>
-                <div class="signature-label">Podpis Koordynatora / Nauczyciela</div>
-              </div>
-              <div class="signature-box">
-                <div class="signature-line"></div>
-                <div class="signature-label">Podpis Dyrektora Placówki (Opcjonalnie)</div>
-              </div>
-            </div>
-
-            <div class="footer">
-              Dokument wygenerowany weryfikatów z systemu SportRecrut. Opatrzony automatycznie.<br>
-              Identyfikator dokumentu: SR-${Math.random().toString(36).substr(2, 9).toUpperCase()}-${Date.now()}
-            </div>
-          </body>
-        </html>
-      `;
+      const htmlContent = generateHtmlReport();
 
       const { uri } = await Print.printToFileAsync({ html: htmlContent });
       const isAvailable = await Sharing.isAvailableAsync();
@@ -341,10 +348,42 @@ export default function ReportExport() {
 
   const handleSendToMinistry = () => {
     if (totalStudents === 0) {
-      Alert.alert('Brak danych', 'Raport jest pusty, nie można wysłać pustych danych do Ministerstwa.');
+      Alert.alert('Brak danych', 'Nie masz jeszcze uczniów do wygenerowania raportu dla Ministerstwa.');
       return;
     }
-    Alert.alert('Sukces', `Raport placówki (${teacherSchool}) wysłany do Ministerstwa Sportu! ✅\nPotwierdzenie otrzymasz na email.`);
+
+    Alert.alert(
+      'Potwierdź Wysyłkę',
+      'Czy na pewno chcesz przesłać aktualny raport do weryfikacji przez system Ministerstwa Sportu?',
+      [
+        { text: 'Anuluj', style: 'cancel' },
+        { 
+          text: 'Wyślij', 
+          onPress: async () => {
+            try {
+              const htmlContent = generateHtmlReport();
+              const { uri } = await Print.printToFileAsync({ html: htmlContent });
+              
+              const isAvailable = await MailComposer.isAvailableAsync();
+              
+              if (isAvailable) {
+                await MailComposer.composeAsync({
+                  recipients: ['raporty@msit.gov.pl'],
+                  subject: `Raport Ewaluacyjny Szkoły: ${teacherSchool}`,
+                  body: 'Dzień dobry,\n\nw załączniku przesyłam automatycznie wygenerowany raport ewaluacyjny poziomu sportowego mojej szkoły z systemu wizytówki SportRecrut.\n\nZ wyrazami szacunku.',
+                  attachments: [uri],
+                });
+              } else {
+                Alert.alert('Błąd Oprogramowania', 'Nie znaleziono domyślnego klienta poczty. Skonfiguruj e-mail w telefonie lub udostępnij pobrany plik PDF ręcznie.');
+              }
+            } catch (error) {
+              console.error(error);
+              Alert.alert('Błąd', 'Nie powiodło się wywołanie klienta pocztowego.');
+            }
+          } 
+        }
+      ]
+    );
   };
 
   return (
