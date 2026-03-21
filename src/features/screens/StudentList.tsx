@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal } from 'react-native';
+import StudentProfile from './StudentProfile';
 import { Flame, TrendingUp, TrendingDown, AlertTriangle, ChevronRight, Clock } from 'lucide-react-native';
 import { useNavigation, CompositeNavigationProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -18,6 +19,7 @@ type StudentListNav = CompositeNavigationProp<
 export default function StudentList() {
   const navigation = useNavigation<StudentListNav>();
   const [activeFilter, setActiveFilter] = useState<'all' | 'pending' | 'best' | 'streak' | 'inactive'>('all');
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
   // Derive display data from MOCK_STUDENTS
   const students = MOCK_STUDENTS.map((athlete, index) => {
@@ -148,7 +150,7 @@ export default function StudentList() {
               return (
                 <NeonCard
                   key={student.number}
-                  onClick={() => navigation.navigate('StudentTabs', { screen: 'StudentProfile' })}
+                  onClick={() => setSelectedStudentId(student.id)}
                   style={!student.active ? styles.inactiveCard : undefined}
                 >
                   <View style={styles.studentRow}>
@@ -222,6 +224,19 @@ export default function StudentList() {
         </View>
       </ScrollView>
 
+      {/* Student Profile Modal */}
+      <Modal
+        visible={selectedStudentId !== null}
+        animationType="slide"
+        presentationStyle="fullScreen"
+      >
+        {selectedStudentId && (
+          <StudentProfile
+            studentId={selectedStudentId}
+            onClose={() => setSelectedStudentId(null)}
+          />
+        )}
+      </Modal>
     </View>
   );
 }

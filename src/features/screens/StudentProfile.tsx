@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, Alert } from 'react-native';
-import { Download, Flame, CheckCircle, XCircle } from 'lucide-react-native';
+import { Download, Flame, CheckCircle, XCircle, ArrowLeft } from 'lucide-react-native';
 import { NeonCard } from '../components/NeonCard';
 import { NeonIcon } from '../components/NeonIcon';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../styles/theme';
@@ -11,8 +11,10 @@ import * as Sharing from 'expo-sharing';
 
 import { MOCK_STUDENTS, Athlete } from '../data/MockStudents';
 
-// Wykorzystaj pierwszego zawodnika jako mock logiczny do wyświetlenia
-const mockStudent: Athlete = MOCK_STUDENTS[0];
+interface StudentProfileProps {
+  studentId?: string;
+  onClose?: () => void;
+}
 
 // Radar Chart
 function RadarChart({ data, size = 320 }: { data: { attribute: string; value: number }[]; size?: number }) {
@@ -182,7 +184,12 @@ const generatePDF = async (student: Athlete, streak: number) => {
   }
 };
 
-export default function StudentProfile() {
+export default function StudentProfile({ studentId, onClose }: StudentProfileProps) {
+  // Jeśli studentId podane (z widoku nauczyciela), użyj tego ucznia; w przeciwnym razie domyślny
+  const mockStudent: Athlete = studentId
+    ? MOCK_STUDENTS.find(s => s.id === studentId) || MOCK_STUDENTS[0]
+    : MOCK_STUDENTS[0];
+
   const ratingScale = useRef(new Animated.Value(0)).current;
   const flamePulse = useRef(new Animated.Value(1)).current;
   const spinValue = useRef(new Animated.Value(0)).current;
@@ -255,6 +262,11 @@ export default function StudentProfile() {
         <View style={styles.innerPadding}>
           {/* Header */}
           <View style={styles.headerRow}>
+            {onClose && (
+              <TouchableOpacity onPress={onClose} style={styles.backButton}>
+                <ArrowLeft size={24} color={Colors.white} />
+              </TouchableOpacity>
+            )}
             <View style={styles.avatarLarge}>
               <Text style={styles.avatarLargeText}>👤</Text>
             </View>
@@ -430,6 +442,10 @@ const styles = StyleSheet.create({
   innerPadding: {
     padding: Spacing.xl,
     paddingTop: 60,
+  },
+  backButton: {
+    padding: Spacing.sm,
+    marginRight: Spacing.xs,
   },
   headerRow: {
     flexDirection: 'row',
