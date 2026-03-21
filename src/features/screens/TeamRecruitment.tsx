@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Modal } from 'react-native';
 import { X, Check, Award, Bell, BellRing, Zap, TrendingUp, Plus, Star, Users, ChevronDown } from 'lucide-react-native';
 import { NeonCard } from '../components/NeonCard';
-import { BottomNav } from '../components/BottomNav';
+import { NeonIcon } from '../components/NeonIcon';
+
 import { Colors, Spacing, FontSize, BorderRadius } from '../../styles/theme';
 
 
@@ -300,7 +301,6 @@ export default function TeamRecruitment() {
         </View>
       </Modal>
 
-      <BottomNav type="teacher" />
     </View>
   );
 }

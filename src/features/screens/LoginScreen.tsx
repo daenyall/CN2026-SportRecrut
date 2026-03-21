@@ -137,7 +137,7 @@ export default function LoginScreen() {
             <TouchableOpacity
               style={styles.primaryButton}
               activeOpacity={0.8}
-              onPress={() => navigation.navigate('TeacherDashboard')}
+              onPress={() => navigation.navigate('TeacherTabs', { screen: 'TeacherDashboard' })}
             >
               <Text style={styles.primaryButtonText}>Jestem Nauczycielem</Text>
             </TouchableOpacity>
@@ -147,7 +147,7 @@ export default function LoginScreen() {
             <TouchableOpacity
               style={styles.outlineButton}
               activeOpacity={0.8}
-              onPress={() => navigation.navigate('StudentDashboard')}
+              onPress={() => navigation.navigate('StudentTabs', { screen: 'StudentDashboard' })}
             >
               <Text style={styles.outlineButtonText}>Jestem Uczniem</Text>
             </TouchableOpacity>

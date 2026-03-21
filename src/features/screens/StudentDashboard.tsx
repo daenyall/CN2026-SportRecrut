@@ -1,16 +1,21 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { BarChart3, Play, Trophy, Map, Flame, Gift } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, CompositeNavigationProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { MaterialTopTabNavigationProp } from '@react-navigation/material-top-tabs';
 import { NeonCard } from '../components/NeonCard';
 import { NeonIcon } from '../components/NeonIcon';
-import { BottomNav } from '../components/BottomNav';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../styles/theme';
-import type { RootStackParamList } from '../routes';
+import type { RootStackParamList, StudentTabParamList } from '../routes';
+
+type DashboardNavProp = CompositeNavigationProp<
+  MaterialTopTabNavigationProp<StudentTabParamList, 'StudentDashboard'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 
 export default function StudentDashboard() {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<DashboardNavProp>();
 
   const headerOpacity = useRef(new Animated.Value(0)).current;
   const headerTranslateX = useRef(new Animated.Value(-20)).current;
@@ -147,8 +152,6 @@ export default function StudentDashboard() {
           </NeonCard>
         </View>
       </ScrollView>
-
-      <BottomNav type="student" />
     </View>
   );
 }

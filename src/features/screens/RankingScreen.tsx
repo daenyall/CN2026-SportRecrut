@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { Medal, TrendingUp, TrendingDown, Flame } from 'lucide-react-native';
 import { NeonCard } from '../components/NeonCard';
-import { BottomNav } from '../components/BottomNav';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../styles/theme';
 
 export default function RankingScreen() {
@@ -149,8 +148,6 @@ export default function RankingScreen() {
           </View>
         </View>
       </ScrollView>
-
-      <BottomNav type="student" />
     </View>
   );
 }

@@ -1,13 +1,23 @@
-export type RootStackParamList = {
-  Login: undefined;
+import type { NavigatorScreenParams } from '@react-navigation/native';
+
+export type StudentTabParamList = {
   StudentDashboard: undefined;
-  StudentProfile: undefined;
   TestForm: undefined;
-  StreakScreen: undefined;
+  StudentProfile: undefined;
   RankingScreen: undefined;
+  HeatMapScreen: undefined;
+};
+
+export type TeacherTabParamList = {
   TeacherDashboard: undefined;
   StudentList: undefined;
   TeamRecruitment: undefined;
   ReportExport: undefined;
-  HeatMapScreen: undefined;
+};
+
+export type RootStackParamList = {
+  Login: undefined;
+  StudentTabs: NavigatorScreenParams<StudentTabParamList>;
+  TeacherTabs: NavigatorScreenParams<TeacherTabParamList>;
+  StreakScreen: undefined;
 };

@@ -2,7 +2,6 @@ import React, { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, Dimensions, ScrollView, Animated } from 'react-native';
 import { MapPin } from 'lucide-react-native';
 import { NeonCard } from '../components/NeonCard';
-import { BottomNav } from '../components/BottomNav';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../styles/theme';
 import { useRoute } from '@react-navigation/native';
 

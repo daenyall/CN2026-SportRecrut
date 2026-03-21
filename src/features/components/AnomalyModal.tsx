@@ -63,7 +63,7 @@ export function AnomalyModal({
     if (onConfirm) {
       onConfirm();
     }
-    navigation.navigate('StudentProfile');
+    navigation.navigate('StudentTabs', { screen: 'StudentProfile' });
   };
 
   return (

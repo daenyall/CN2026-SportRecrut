@@ -3,7 +3,6 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, Alert }
 import { Download, Flame, CheckCircle, XCircle } from 'lucide-react-native';
 import { NeonCard } from '../components/NeonCard';
 import { NeonIcon } from '../components/NeonIcon';
-import { BottomNav } from '../components/BottomNav';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../styles/theme';
 import Svg, { Polygon, Circle as SvgCircle, Text as SvgText, Line, Defs, RadialGradient, Stop } from 'react-native-svg';
 import LottieView from 'lottie-react-native';
@@ -413,8 +412,6 @@ export default function StudentProfile() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-
-      <BottomNav type="student" />
     </View>
   );
 }
