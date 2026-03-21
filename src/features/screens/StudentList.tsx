@@ -336,7 +336,7 @@ const styles = StyleSheet.create({
   studentNumber: { position: 'absolute', bottom: -4, right: -4, width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.cardBg, alignItems: 'center', justifyContent: 'center' },
   studentNumberText: { color: Colors.neonGreen, fontSize: FontSize.xs, fontWeight: '700' },
   studentInfo: { flex: 1, minWidth: 0 },
-  studentName: { color: Colors.white, fontWeight: '700', fontSize: FontSize.base },
+  studentName: { flexShrink: 1, color: Colors.white, fontWeight: '700', fontSize: FontSize.base },
   pendingBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.orange, paddingHorizontal: 4, paddingVertical: 2, borderRadius: 4, gap: 2 },
   pendingBadgeText: { color: Colors.bgDeep, fontSize: 9, fontWeight: '800', textTransform: 'uppercase' },
   studentMeta: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: 2 },
