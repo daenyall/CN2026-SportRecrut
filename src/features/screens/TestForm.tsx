@@ -24,7 +24,6 @@ type TestFormNavProp = CompositeNavigationProp<
   MaterialTopTabNavigationProp<StudentTabParamList, 'TestForm'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
-import type { RootStackParamList } from '../routes';
 import { checkAnomaly } from '../utils/anomalyUtils';
 import { MOCK_STUDENTS } from '../data/MockStudents';
 

@@ -111,9 +111,6 @@ export default function HeatMapScreen() {
                 </View>
 
             </ScrollView>
-
-            {/* Dolna Nawigacja z Twojego kodu */}
-            <BottomNav type={userType} />
         </View>
     );
 }
