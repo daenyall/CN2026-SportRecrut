@@ -5,11 +5,12 @@ import { Colors, BorderRadius, Spacing } from '../../styles/theme';
 interface NeonCardProps {
   children: ReactNode;
   glow?: boolean;
+  glowColor?: string;
   onClick?: () => void;
   style?: object;
 }
 
-export function NeonCard({ children, glow = false, onClick, style }: NeonCardProps) {
+export function NeonCard({ children, glow = false, glowColor, onClick, style }: NeonCardProps) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(20)).current;
 
@@ -33,6 +34,7 @@ export function NeonCard({ children, glow = false, onClick, style }: NeonCardPro
       style={[
         styles.card,
         glow && styles.glow,
+        glowColor && glow ? { shadowColor: glowColor } : {},
         { opacity: fadeAnim, transform: [{ translateY }] },
         style,
       ]}
