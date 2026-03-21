@@ -23,28 +23,19 @@ import { AnomalyModal } from '../components/AnomalyModal';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../styles/theme';
 import type { RootStackParamList, StudentTabParamList } from '../routes';
 import { checkAnomaly } from '../utils/anomalyUtils';
-import { MOCK_STUDENTS } from '../data/MockStudents';
-import { doc, setDoc, arrayUnion } from 'firebase/firestore';
-import { db } from '../config/firebase';
+
+// FIREBASE IMPORTS
+import { auth, db } from '../config/firebase';
+import { doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { updateStreak } from '../utils/streakUtils';
+import { evaluateAchievements, ACHIEVEMENTS } from '../config/achievements';
+import { getRankDisplay } from '../config/ranks';
+import { EXERCISES } from '../config/exercises';
 
 type TestFormNavProp = CompositeNavigationProp<
   MaterialTopTabNavigationProp<StudentTabParamList, 'TestForm'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
-
-const EXERCISES = [
-  { id: 'plank', name: 'Plank', emoji: '🧘', unit: 's', type: 'single', average: 90, scoring: 'higher' },
-  { id: 'run100', name: 'Bieg 100m', emoji: '🏃', unit: 's', type: 'single', average: 15.2, scoring: 'lower' },
-  { id: 'jump', name: 'Skok w dal', emoji: '📏', unit: 'cm', type: 'single', average: 165, scoring: 'higher' },
-  { id: 'pushups', name: 'Pompki', emoji: '💪', unit: 'powt.', type: 'single', average: 25, scoring: 'higher' },
-  { id: 'pullups', name: 'Podciąganie', emoji: '🧗', unit: 'powt.', type: 'single', average: 5, scoring: 'higher' },
-  { id: 'situps', name: 'Brzuszki', emoji: '🤸', unit: 'powt.', type: 'single', average: 35, scoring: 'higher' },
-  { id: 'run1000', name: 'Bieg na 1000m', emoji: '🏃‍♂️', unit: 's', type: 'single', average: 270, scoring: 'lower' },
-  { id: 'squats', name: 'Przysiady', emoji: '🏋️', unit: 'kg', type: 'weight_reps', average: 60, scoring: 'higher' },
-  { id: 'bench', name: 'Wyciskanie leżąc', emoji: '🏋️‍♂️', unit: 'kg', type: 'weight_reps', average: 50, scoring: 'higher' },
-  { id: 'deadlift', name: 'Martwy ciąg', emoji: '🏗️', unit: 'kg', type: 'weight_reps', average: 70, scoring: 'higher' },
-];
 
 type SetEntry = {
   setId: string;
@@ -63,7 +54,6 @@ function ProgressBar({ percent, forceTrigger }: { percent: number, forceTrigger:
 
   const [targetPercent, setTargetPercent] = useState(0);
 
-  // Debounce: 2 sekundy bez wpisywania
   useEffect(() => {
     const timer = setTimeout(() => {
       setTargetPercent(percent);
@@ -71,20 +61,17 @@ function ProgressBar({ percent, forceTrigger }: { percent: number, forceTrigger:
     return () => clearTimeout(timer);
   }, [percent]);
 
-  // Natychmiastowa aktualizacja przy wyjściu z pola (onBlur)
   useEffect(() => {
     setTargetPercent(percent);
   }, [forceTrigger]);
 
   useEffect(() => {
-    // Płynne wypełnianie paska
     Animated.timing(animatedWidth, {
       toValue: targetPercent,
       duration: 800,
       useNativeDriver: false,
     }).start();
 
-    // Estetyczna pętla ognia (Flame) dla wyniku > 115%
     if (targetPercent >= 115) {
       Animated.loop(
         Animated.sequence([
@@ -102,7 +89,7 @@ function ProgressBar({ percent, forceTrigger }: { percent: number, forceTrigger:
 
   const barColor = isFlame ? flameAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['#FF4500', '#FFA500'] // Płynne przejście Czerwono-Pomarańczowy -> Jasny Pomarańczowy
+    outputRange: ['#FF4500', '#FFA500']
   }) : animatedWidth.interpolate({
     inputRange: [0, 99, 100, 114],
     outputRange: [Colors.neonGreen, Colors.neonGreen, '#FFD700', '#FFD700'],
@@ -111,12 +98,12 @@ function ProgressBar({ percent, forceTrigger }: { percent: number, forceTrigger:
 
   const glowRadius = flameAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [6, 14] // "Oddychanie" cienia
+    outputRange: [6, 14]
   });
 
   const borderColor = flameAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['rgba(255, 215, 0, 0.3)', 'rgba(255, 255, 255, 0.8)'] // Złota do białej poświata na krawędzi
+    outputRange: ['rgba(255, 215, 0, 0.3)', 'rgba(255, 255, 255, 0.8)']
   });
 
   return (
@@ -157,6 +144,19 @@ export default function TestForm() {
     currentValue: string;
   } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [studentData, setStudentData] = useState<any>(null);
+
+  // Pobierz dane ucznia z Firebase
+  useEffect(() => {
+    const loadUser = async () => {
+      const user = auth.currentUser;
+      if (user) {
+        const docSnap = await getDoc(doc(db, 'students', user.uid));
+        if (docSnap.exists()) setStudentData(docSnap.data());
+      }
+    };
+    loadUser();
+  }, []);
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -221,6 +221,8 @@ export default function TestForm() {
     }));
   };
 
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   const updateSet = (exerciseId: string, setId: string, field: 'value' | 'weightValue', newValue: string) => {
     setActiveExercises(prev => prev.map(ex => {
       if (ex.exerciseId === exerciseId) {
@@ -231,6 +233,10 @@ export default function TestForm() {
       }
       return ex;
     }));
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      triggerProgressUpdate();
+    }, 300);
   };
 
   const getBestValue = (ex: ActiveExercise, exerciseDef: any) => {
@@ -303,84 +309,138 @@ export default function TestForm() {
   const processSubmit = async () => {
     try {
       setIsSubmitting(true);
+      const user = auth.currentUser;
+      if (!user) throw new Error("Brak autoryzacji");
 
-      // KROK 1: Symulacja uploadu zdjęć (kółko ładowania)
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // KROK 1: Symulacja uploadu zdjęć
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       const fakeProofFilenames = proofImages.length > 0 ? generateFakeFilenames(proofImages.length) : [];
 
       // KROK 2: Przygotuj obiekt nowego testu
-      const newTestRecord = {
-        date: new Date().toISOString(),
-        exercises: activeExercises.map(ex => {
-          const def = EXERCISES.find(e => e.id === ex.exerciseId);
-          return {
-            exerciseId: ex.exerciseId,
-            name: def?.name ?? ex.exerciseId,
-            unit: def?.unit ?? '',
-            sets: ex.sets.map(s => ({
-              value: parseFloat(s.value) || 0,
-              weightValue: parseFloat(s.weightValue) || 0,
-            })),
-            bestValue: getBestValue(ex, def),
-          };
-        }),
-        proofFilenames: fakeProofFilenames,
-      };
-
-      // KROK 3: Zapis do Firestore
-      await setDoc(doc(db, 'students', 'mock_student_1'), {
-        testResults: arrayUnion(newTestRecord),
-      }, { merge: true });
-
-      // KROK 4: Aktualizacja streak
-      await updateStreak();
-
-      // KROK 5: Sprawdzenie anomalii
-      const referenceStudent = MOCK_STUDENTS[0];
-      const lastTest = referenceStudent.testResults[referenceStudent.testResults.length - 1];
-
-      let detectedAnomaly = false;
-
-      activeExercises.forEach(ex => {
+      const exercisesPayload = activeExercises.map(ex => {
         const def = EXERCISES.find(e => e.id === ex.exerciseId);
-        if (!def) return;
-
-        const currentScore = getBestValue(ex, def);
-        if (currentScore <= 0) return;
-
-        let previousScore = def.average;
-        if (lastTest) {
-          if (def.id === 'plank') previousScore = lastTest.plank;
-          else if (def.id === 'run100') previousScore = lastTest.sprint;
-          else if (def.id === 'jump') previousScore = lastTest.longJump;
-        }
-
-        const isAnomaly = def.scoring === 'lower'
-          ? checkAnomaly(previousScore, currentScore)
-          : checkAnomaly(currentScore, previousScore);
-
-        if (isAnomaly && !detectedAnomaly) {
-          detectedAnomaly = true;
-          const improvement = def.scoring === 'lower'
-            ? Math.round(((previousScore - currentScore) / previousScore) * 100)
-            : Math.round(((currentScore - previousScore) / previousScore) * 100);
-
-          setAnomalyDetails({
-            exerciseName: def.name,
-            improvement,
-            previousValue: `${previousScore}${def.unit}`,
-            currentValue: `${currentScore}${def.unit}`,
-          });
-        }
+        return {
+          exerciseId: ex.exerciseId,
+          name: def?.name ?? ex.exerciseId,
+          unit: def?.unit ?? '',
+          sets: ex.sets.map(s => ({
+            value: parseFloat(s.value) || 0,
+            weightValue: parseFloat(s.weightValue) || 0,
+          })),
+          bestValue: getBestValue(ex, def),
+        };
       });
 
-      if (detectedAnomaly) {
-        setShowAnomalyModal(true);
+      const newTestRecord = {
+        date: new Date().toISOString(),
+        exercises: exercisesPayload,
+        proofFilenames: fakeProofFilenames,
+        status: 'pending',
+      };
+
+      // KROK 3: Ewaluacja osiągnięć (medali)
+      const referenceStudent = {
+        weight: studentData?.weight || 0,
+        height: studentData?.height || 0,
+        rankId: studentData?.rankId || 0,
+        earnedMedals: studentData?.earnedMedals || [],
+        testResults: studentData?.testResults || [],
+      };
+
+      const { newMedals, highestRankReward } = evaluateAchievements(exercisesPayload, referenceStudent as any);
+
+      const firebaseUpdate: Record<string, any> = {
+        testResults: arrayUnion(newTestRecord),
+        lastWorkoutDate: new Date().toISOString(),
+      };
+
+      if (newMedals.length > 0) {
+        firebaseUpdate.earnedMedals = arrayUnion(...newMedals);
+      }
+
+      if (highestRankReward !== null && highestRankReward > (studentData?.rankId || 0)) {
+        firebaseUpdate.rankId = highestRankReward;
+      }
+
+      // KROK 4: Zapis do Firestore
+      const studentRef = doc(db, 'students', user.uid);
+      await updateDoc(studentRef, firebaseUpdate);
+
+      // KROK 5: Aktualizacja streak
+      await updateStreak();
+
+      // KROK 6: Reset formularza do stanu początkowego
+      setActiveExercises([]);
+      setProofImages([]);
+      setAnomalyDetails(null);
+      setForceUpdateTrigger(0);
+
+      // KROK 7: Łańcuch powiadomień UI
+      const showAnomalyCheck = () => {
+        const history = studentData?.testResults || [];
+        let detectedAnomaly = false;
+
+        activeExercises.forEach(ex => {
+          const def = EXERCISES.find(e => e.id === ex.exerciseId);
+          if (!def) return;
+
+          const currentScore = getBestValue(ex, def);
+          if (currentScore <= 0) return;
+
+          let previousScore = def.average;
+          // Szukaj poprzedniego wyniku w historii Firebase
+          const lastMatchingTest = [...history].reverse().find((t: any) =>
+            t.exercises?.some((e: any) => e.exerciseId === ex.exerciseId));
+          if (lastMatchingTest) {
+            const prevEx = lastMatchingTest.exercises?.find((e: any) => e.exerciseId === ex.exerciseId);
+            if (prevEx) previousScore = prevEx.bestValue;
+          }
+
+          const isAnomaly = def.scoring === 'lower'
+            ? checkAnomaly(previousScore, currentScore)
+            : checkAnomaly(currentScore, previousScore);
+
+          if (isAnomaly && !detectedAnomaly) {
+            detectedAnomaly = true;
+            const improvement = def.scoring === 'lower'
+              ? Math.round(((previousScore - currentScore) / previousScore) * 100)
+              : Math.round(((currentScore - previousScore) / previousScore) * 100);
+
+            setAnomalyDetails({
+              exerciseName: def.name,
+              improvement,
+              previousValue: `${previousScore}${def.unit}`,
+              currentValue: `${currentScore}${def.unit}`,
+            });
+          }
+        });
+
+        if (detectedAnomaly) {
+          setShowAnomalyModal(true);
+        } else {
+          Alert.alert('Zapis wysłany', 'Wyniki zostały przesłane. Czekają na zatwierdzenie przez nauczyciela.', [
+            { text: 'OK', onPress: () => navigation.navigate('StudentProfile') },
+          ]);
+        }
+      };
+
+      if (newMedals.length > 0) {
+        const medalNames = newMedals
+          .map(id => ACHIEVEMENTS.find(a => a.id === id)?.name ?? id)
+          .join(', ');
+
+        const rankMsg = highestRankReward !== null && highestRankReward > (studentData?.rankId || 0)
+          ? `\nNowa ranga: ${getRankDisplay(highestRankReward)} 🎖️`
+          : '';
+
+        Alert.alert(
+          '🏆 Nowe Osiągnięcie!',
+          `Zdobyto: ${medalNames}${rankMsg}`,
+          [{ text: 'Super!', onPress: showAnomalyCheck }],
+        );
       } else {
-        Alert.alert('Zapis wysłany', 'Wyniki zostały przesłane. Czekają na zatwierdzenie przez nauczyciela.', [
-          { text: 'OK', onPress: () => navigation.navigate('StudentProfile') },
-        ]);
+        showAnomalyCheck();
       }
     } catch (error) {
       console.error('Błąd wysyłki:', error);
@@ -571,15 +631,23 @@ export default function TestForm() {
           </View>
         </View>
       </ScrollView>
+
       <AnomalyModal
         isOpen={showAnomalyModal}
-        onClose={() => setShowAnomalyModal(false)}
+        onClose={() => {
+          setShowAnomalyModal(false);
+          navigation.navigate('StudentDashboard');
+        }}
+        onViewProfile={() => {
+          setShowAnomalyModal(false);
+          navigation.navigate('StudentProfile');
+        }}
         onConfirm={() => {
           Alert.alert('Status', 'Wysłano pomyślnie. Wynik czeka na weryfikację nauczyciela.', [
             { text: 'OK', onPress: () => navigation.navigate('StudentProfile') }
           ]);
         }}
-        studentName={MOCK_STUDENTS[0].name}
+        studentName={studentData?.name || "Uczeń"}
         improvement={anomalyDetails?.improvement}
         previousValue={anomalyDetails?.previousValue}
         currentValue={anomalyDetails?.currentValue}
