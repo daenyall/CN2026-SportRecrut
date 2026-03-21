@@ -20,31 +20,52 @@ export default function RankingScreen() {
 
   const fetchRankings = async () => {
     try {
-      const usersSnap = await getDocs(collection(db, 'users'));
+      const usersSnap = await getDocs(collection(db, 'students'));
       let usersList: any[] = [];
       usersSnap.forEach((doc) => {
         usersList.push({ ...doc.data(), id: doc.id });
       });
 
-      // Merge Firebase data with MOCK_STUDENTS to update scores
-      const mergedStudents = MOCK_STUDENTS.map(mockStudent => {
-        const fireStudent = usersList.find((u: any) => u.uid === mockStudent.id || u.id === mockStudent.id);
-        if (fireStudent) {
-          const stats = fireStudent.stats || mockStudent.stats;
-          const score = fireStudent.overall || Math.round(((stats.speed||0) + (stats.strength||0) + (stats.stamina||0) + (stats.jump||0) + (stats.agility||0)) / 5) || mockStudent.overall;
-          return { ...mockStudent, ...fireStudent, overall: score, id: mockStudent.id };
-        }
-        return mockStudent;
+      // Combine MOCK_STUDENTS and Firebase users
+      const allStudentsMap = new Map();
+
+      MOCK_STUDENTS.forEach(mockStudent => {
+        allStudentsMap.set(mockStudent.id, { ...mockStudent });
       });
 
+      usersList.forEach(fireStudent => {
+        const id = fireStudent.uid || fireStudent.id;
+        const existing = allStudentsMap.get(id);
+        
+        const stats = fireStudent.stats || (existing ? existing.stats : null);
+        let score = fireStudent.overall;
+        
+        if (!score && stats) {
+          score = Math.round(((stats.speed||0) + (stats.strength||0) + (stats.stamina||0) + (stats.jump||0) + (stats.agility||0)) / 5);
+        }
+        
+        if (!score && existing) {
+          score = existing.overall;
+        }
+
+        allStudentsMap.set(id, {
+          ...(existing || {}),
+          ...fireStudent,
+          overall: score || 0,
+          id: id
+        });
+      });
+
+      const mergedStudents = Array.from(allStudentsMap.values());
+
       const sorted = mergedStudents
-        .sort((a, b) => b.overall - a.overall)
+        .sort((a, b) => (b.overall || 0) - (a.overall || 0))
         .slice(0, 10)
         .map((s, index) => ({
           rank: index + 1,
           name: s.name || s.displayName || 'Brak Imienia',
           class: s.class || '-',
-          score: s.overall,
+          score: s.overall || 0,
           streak: s.currentStreak || 0,
           trend: index % 4 === 0 ? 'down' : (index % 2 === 0 ? 'up' : 'same'),
           id: s.id,
