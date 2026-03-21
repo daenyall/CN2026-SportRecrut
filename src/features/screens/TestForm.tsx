@@ -9,7 +9,10 @@ import {
   Animated,
   Alert,
   Modal,
+  ActivityIndicator,
+  Image,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Camera, ArrowRight, CheckCircle, Plus, Trash2, X } from 'lucide-react-native';
 import { useNavigation, CompositeNavigationProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -21,6 +24,9 @@ import { Colors, Spacing, FontSize, BorderRadius } from '../../styles/theme';
 import type { RootStackParamList, StudentTabParamList } from '../routes';
 import { checkAnomaly } from '../utils/anomalyUtils';
 import { MOCK_STUDENTS } from '../data/MockStudents';
+import { doc, setDoc, arrayUnion } from 'firebase/firestore';
+import { db } from '../config/firebase';
+import { updateStreak } from '../utils/streakUtils';
 
 type TestFormNavProp = CompositeNavigationProp<
   MaterialTopTabNavigationProp<StudentTabParamList, 'TestForm'>,
@@ -140,7 +146,7 @@ function ProgressBar({ percent, forceTrigger }: { percent: number, forceTrigger:
 export default function TestForm() {
   const navigation = useNavigation<TestFormNavProp>();
   const [activeExercises, setActiveExercises] = useState<ActiveExercise[]>([]);
-  const [photoAdded, setPhotoAdded] = useState(false);
+  const [proofImages, setProofImages] = useState<string[]>([]);
   const [showAnomalyModal, setShowAnomalyModal] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [forceUpdateTrigger, setForceUpdateTrigger] = useState(0);
@@ -150,6 +156,28 @@ export default function TestForm() {
     previousValue: string;
     currentValue: string;
   } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Brak uprawnień', 'Przyznaj dostęp do galerii, aby dodać zdjęcia.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      setProofImages(prev => [...prev, ...result.assets.map(a => a.uri)]);
+    }
+  };
+
+  const generateFakeFilenames = (count: number): string[] => {
+    const ts = Date.now();
+    return Array.from({ length: count }, (_, i) => `proof_${i + 1}_${ts}.jpg`);
+  };
 
   const triggerProgressUpdate = () => setForceUpdateTrigger(prev => prev + 1);
 
@@ -258,7 +286,7 @@ export default function TestForm() {
       return;
     }
 
-    if (!photoAdded) {
+    if (proofImages.length === 0) {
       Alert.alert(
         "Weryfikacja zagrożona",
         "Brak dokumentacji fotograficznej. Ryzyko odrzucenia wyników.",
@@ -272,54 +300,93 @@ export default function TestForm() {
     }
   };
 
-  const processSubmit = () => {
-    // Use the first MOCK_STUDENT as reference for previous scores
-    const referenceStudent = MOCK_STUDENTS[0];
-    const lastTest = referenceStudent.testResults[referenceStudent.testResults.length - 1];
+  const processSubmit = async () => {
+    try {
+      setIsSubmitting(true);
 
-    let detectedAnomaly = false;
+      // KROK 1: Symulacja uploadu zdjęć (kółko ładowania)
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
-    activeExercises.forEach(ex => {
-      const def = EXERCISES.find(e => e.id === ex.exerciseId);
-      if (!def) return;
+      const fakeProofFilenames = proofImages.length > 0 ? generateFakeFilenames(proofImages.length) : [];
 
-      const currentScore = getBestValue(ex, def);
-      if (currentScore <= 0) return;
+      // KROK 2: Przygotuj obiekt nowego testu
+      const newTestRecord = {
+        date: new Date().toISOString(),
+        exercises: activeExercises.map(ex => {
+          const def = EXERCISES.find(e => e.id === ex.exerciseId);
+          return {
+            exerciseId: ex.exerciseId,
+            name: def?.name ?? ex.exerciseId,
+            unit: def?.unit ?? '',
+            sets: ex.sets.map(s => ({
+              value: parseFloat(s.value) || 0,
+              weightValue: parseFloat(s.weightValue) || 0,
+            })),
+            bestValue: getBestValue(ex, def),
+          };
+        }),
+        proofFilenames: fakeProofFilenames,
+      };
 
-      // Map exercise to previous test result
-      let previousScore = def.average; // fallback to average
-      if (lastTest) {
-        if (def.id === 'plank') previousScore = lastTest.plank;
-        else if (def.id === 'run100') previousScore = lastTest.sprint;
-        else if (def.id === 'jump') previousScore = lastTest.longJump;
+      // KROK 3: Zapis do Firestore
+      await setDoc(doc(db, 'students', 'mock_student_1'), {
+        testResults: arrayUnion(newTestRecord),
+      }, { merge: true });
+
+      // KROK 4: Aktualizacja streak
+      await updateStreak();
+
+      // KROK 5: Sprawdzenie anomalii
+      const referenceStudent = MOCK_STUDENTS[0];
+      const lastTest = referenceStudent.testResults[referenceStudent.testResults.length - 1];
+
+      let detectedAnomaly = false;
+
+      activeExercises.forEach(ex => {
+        const def = EXERCISES.find(e => e.id === ex.exerciseId);
+        if (!def) return;
+
+        const currentScore = getBestValue(ex, def);
+        if (currentScore <= 0) return;
+
+        let previousScore = def.average;
+        if (lastTest) {
+          if (def.id === 'plank') previousScore = lastTest.plank;
+          else if (def.id === 'run100') previousScore = lastTest.sprint;
+          else if (def.id === 'jump') previousScore = lastTest.longJump;
+        }
+
+        const isAnomaly = def.scoring === 'lower'
+          ? checkAnomaly(previousScore, currentScore)
+          : checkAnomaly(currentScore, previousScore);
+
+        if (isAnomaly && !detectedAnomaly) {
+          detectedAnomaly = true;
+          const improvement = def.scoring === 'lower'
+            ? Math.round(((previousScore - currentScore) / previousScore) * 100)
+            : Math.round(((currentScore - previousScore) / previousScore) * 100);
+
+          setAnomalyDetails({
+            exerciseName: def.name,
+            improvement,
+            previousValue: `${previousScore}${def.unit}`,
+            currentValue: `${currentScore}${def.unit}`,
+          });
+        }
+      });
+
+      if (detectedAnomaly) {
+        setShowAnomalyModal(true);
+      } else {
+        Alert.alert('Zapis wysłany', 'Wyniki zostały przesłane. Czekają na zatwierdzenie przez nauczyciela.', [
+          { text: 'OK', onPress: () => navigation.navigate('StudentProfile') },
+        ]);
       }
-
-      // For "lower is better" exercises, invert the comparison
-      const isAnomaly = def.scoring === 'lower'
-        ? checkAnomaly(previousScore, currentScore)
-        : checkAnomaly(currentScore, previousScore);
-
-      if (isAnomaly && !detectedAnomaly) {
-        detectedAnomaly = true;
-        const improvement = def.scoring === 'lower'
-          ? Math.round(((previousScore - currentScore) / previousScore) * 100)
-          : Math.round(((currentScore - previousScore) / previousScore) * 100);
-
-        setAnomalyDetails({
-          exerciseName: def.name,
-          improvement,
-          previousValue: `${previousScore}${def.unit}`,
-          currentValue: `${currentScore}${def.unit}`,
-        });
-      }
-    });
-
-    if (detectedAnomaly) {
-      setShowAnomalyModal(true);
-    } else {
-      Alert.alert('Zapis wysłany', 'Wyniki zostały przesłane. Czekają na zatwierdzenie przez nauczyciela.', [
-        { text: 'OK', onPress: () => navigation.navigate('StudentProfile') },
-      ]);
+    } catch (error) {
+      console.error('Błąd wysyłki:', error);
+      Alert.alert('Błąd', 'Nie udało się wysłać wyników. Sprawdź połączenie i spróbuj ponownie.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -435,18 +502,35 @@ export default function TestForm() {
                   <NeonIcon Icon={Camera} size={20} color={Colors.neonGreen} />
                   <Text style={styles.photoHeaderText}>Protokół Anti-Cheat</Text>
                 </View>
+                {proofImages.length > 0 && (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: Spacing.sm }}>
+                    <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+                      {proofImages.map((uri, idx) => (
+                        <View key={idx} style={{ position: 'relative' }}>
+                          <Image source={{ uri }} style={{ width: 80, height: 80, borderRadius: 8 }} />
+                          <TouchableOpacity
+                            onPress={() => setProofImages(prev => prev.filter((_, i) => i !== idx))}
+                            style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.red, alignItems: 'center', justifyContent: 'center' }}
+                          >
+                            <X size={12} color={Colors.white} />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  </ScrollView>
+                )}
                 <TouchableOpacity
                   style={[
                     styles.photoButton,
-                    photoAdded && styles.photoButtonAdded,
+                    proofImages.length > 0 && styles.photoButtonAdded,
                   ]}
                   activeOpacity={0.8}
-                  onPress={() => setPhotoAdded(!photoAdded)}
+                  onPress={pickImage}
                 >
-                  {photoAdded ? (
+                  {proofImages.length > 0 ? (
                     <>
-                      <CheckCircle size={32} color={Colors.neonGreen} />
-                      <Text style={styles.photoAddedText}>Stan: Zweryfikowano (Kliknij, aby wyczyścić)</Text>
+                      <Plus size={24} color={Colors.neonGreen} />
+                      <Text style={styles.photoAddedText}>Dodaj więcej zdjęć</Text>
                     </>
                   ) : (
                     <>
@@ -455,10 +539,10 @@ export default function TestForm() {
                     </>
                   )}
                 </TouchableOpacity>
-                {photoAdded && (
+                {proofImages.length > 0 && (
                   <View style={styles.photoVerifiedRow}>
                     <CheckCircle size={16} color={Colors.neonGreen} />
-                    <Text style={styles.photoVerifiedText}>Zgodność fotograficzna potwierdzona</Text>
+                    <Text style={styles.photoVerifiedText}>{proofImages.length} {proofImages.length === 1 ? 'zdjęcie dodane' : 'zdjęć dodanych'}</Text>
                   </View>
                 )}
               </View>
@@ -467,12 +551,22 @@ export default function TestForm() {
 
           <View style={styles.buttonsContainer}>
             <TouchableOpacity
-              style={styles.submitButton}
+              style={[styles.submitButton, isSubmitting && { opacity: 0.5 }]}
               activeOpacity={0.8}
               onPress={handleSubmit}
+              disabled={isSubmitting}
             >
-              <Text style={styles.submitButtonText}>TRANSMISJA DANYCH</Text>
-              <ArrowRight size={20} color={Colors.bgDeep} />
+              {isSubmitting ? (
+                <>
+                  <ActivityIndicator size="small" color={Colors.bgDeep} />
+                  <Text style={styles.submitButtonText}>PRZESYŁANIE DANYCH...</Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.submitButtonText}>TRANSMISJA DANYCH</Text>
+                  <ArrowRight size={20} color={Colors.bgDeep} />
+                </>
+              )}
             </TouchableOpacity>
           </View>
         </View>
