@@ -6,10 +6,12 @@ import { useNavigation, CompositeNavigationProp } from '@react-navigation/native
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MaterialTopTabNavigationProp } from '@react-navigation/material-top-tabs';
 import { NeonCard } from '../components/NeonCard';
+import { collection, getDocs, query, where, getDoc, doc } from 'firebase/firestore';
+import { db, auth } from '../config/firebase';
 
 import { Colors, Spacing, FontSize, BorderRadius } from '../../styles/theme';
 import type { RootStackParamList, TeacherTabParamList } from '../routes';
-import { MOCK_STUDENTS } from '../data/MockStudents';
+
 
 type StudentListNav = CompositeNavigationProp<
   MaterialTopTabNavigationProp<TeacherTabParamList, 'StudentList'>,
@@ -21,9 +23,53 @@ export default function StudentList() {
   const [activeFilter, setActiveFilter] = useState<'all' | 'pending' | 'best' | 'streak' | 'inactive'>('all');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
-  // Derive display data from MOCK_STUDENTS
-  const students = MOCK_STUDENTS.map((athlete, index) => {
-    const isActive = athlete.currentStreak > 0;
+  // STANY DLA DANYCH Z FIREBASE
+  const [firebaseStudents, setFirebaseStudents] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // POBIERANIE DANYCH Z FIREBASE TYLKO DLA SZKOŁY NAUCZYCIELA
+  useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) return;
+
+        // 1. Pobieramy profil nauczyciela, żeby sprawdzić, do jakiej szkoły uczy
+        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+        const teacherSchool = userDoc.data()?.school;
+
+        if (!teacherSchool) {
+          console.log("Nauczyciel nie ma przypisanej szkoły!");
+          setIsLoading(false);
+          return;
+        }
+
+        // 2. Pobieramy z Firestore TYLKO uczniów z tej samej placówki!
+        const q = query(collection(db, 'students'), where('school', '==', teacherSchool));
+        const querySnapshot = await getDocs(q);
+
+        const fetchedData = querySnapshot.docs.map(document => ({
+          id: document.id,
+          ...document.data()
+        }));
+
+        setFirebaseStudents(fetchedData);
+      } catch (error) {
+        console.error("Błąd pobierania uczniów z Firebase: ", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchStudents();
+  }, []);
+
+  // Mapowanie pobranych danych (odpowiednik wcześniejszego MOCK_STUDENTS)
+  const students = firebaseStudents.map((athlete, index) => {
+    // Zabezpieczenie, bo w Firebase mogło to zostać zapisane jako stats.overall albo po prostu overall
+    const overallScore = athlete.overall ?? athlete.stats?.overall ?? 0;
+
+    const isActive = (athlete.currentStreak || 0) > 0;
     let trend: 'up' | 'down' | 'same' = 'same';
     if (athlete.overall >= 75) trend = 'up';
     else if (athlete.overall < 60) trend = 'down';

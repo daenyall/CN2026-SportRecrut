@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
+import { getFirestore } from "firebase/firestore"; // <-- TO JEST KLUCZOWE
+import { getAuth } from "firebase/auth";
 
 // Twoje klucze z Firebase
 const firebaseConfig = {
@@ -18,4 +18,4 @@ const app = initializeApp(firebaseConfig);
 
 // 2. Inicjalizacja bazy danych i jej EKSPORT (Tego brakowało!)
 export const db = getFirestore(app);
-export const storage = getStorage(app);
+export const auth = getAuth(app);
