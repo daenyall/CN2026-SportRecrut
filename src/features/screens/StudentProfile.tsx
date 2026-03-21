@@ -1,6 +1,6 @@
-import React, { useRef, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, Alert } from 'react-native';
-import { Download, Flame, CheckCircle, XCircle, ArrowLeft } from 'lucide-react-native';
+import React, { useRef, useEffect, useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, Alert, Modal, TextInput, Dimensions } from 'react-native';
+import { Download, Flame, CheckCircle, XCircle, ArrowLeft, Settings, X } from 'lucide-react-native';
 import { NeonCard } from '../components/NeonCard';
 import { NeonIcon } from '../components/NeonIcon';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../styles/theme';
@@ -8,6 +8,7 @@ import Svg, { Polygon, Circle as SvgCircle, Text as SvgText, Line, Defs, RadialG
 import LottieView from 'lottie-react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { LineChart } from 'react-native-chart-kit';
 
 import { MOCK_STUDENTS, Athlete } from '../data/MockStudents';
 
@@ -16,10 +17,22 @@ interface StudentProfileProps {
   onClose?: () => void;
 }
 
+const { width: screenWidth } = Dimensions.get('window');
+
+// Funkcja Helper do BMI
+const getBMITheme = (weight: number, height: number) => {
+  const heightM = height / 100;
+  const bmi = weight / (heightM * heightM);
+  if (bmi < 18.5) return '#00C6FF';          // Niedowaga
+  if (bmi >= 18.5 && bmi < 25) return Colors.neonGreen; // Norma
+  if (bmi >= 25 && bmi < 30) return Colors.orange;     // Nadwaga
+  return Colors.red;                           // Otyłość
+};
+
 // Radar Chart
-function RadarChart({ data, size = 320 }: { data: { attribute: string; value: number }[]; size?: number }) {
+function RadarChart({ data, size = 320, themeColor = Colors.neonGreen }: { data: { attribute: string; value: number }[]; size?: number; themeColor?: string }) {
   const center = size / 2;
-  const radius = 105; 
+  const radius = 105;
   const bgRadius = 155; // Idealnie okrągłe, znacznie szersze tło na całą pajęczynę
   const angleStep = (2 * Math.PI) / data.length;
   const levels = 5;
@@ -40,7 +53,7 @@ function RadarChart({ data, size = 320 }: { data: { attribute: string; value: nu
     <Svg width={size} height={size}>
       <Defs>
         <RadialGradient id="grad" cx="50%" cy="50%" rx="50%" ry="50%" fx="50%" fy="50%">
-          <Stop offset="0%" stopColor={Colors.neonGreen} stopOpacity="0.10" />
+          <Stop offset="0%" stopColor={themeColor} stopOpacity="0.10" />
           <Stop offset="100%" stopColor={Colors.bgDeep} stopOpacity="0.9" />
         </RadialGradient>
       </Defs>
@@ -80,17 +93,17 @@ function RadarChart({ data, size = 320 }: { data: { attribute: string; value: nu
       {/* Wypełnienie poligonu gracza */}
       <Polygon
         points={polygonPoints}
-        fill={Colors.neonGreen}
+        fill={themeColor}
         fillOpacity={0.4}
-        stroke={Colors.neonGreen}
+        stroke={themeColor}
         strokeWidth={3}
       />
 
       {dataPoints.map((p, i) => (
-        <SvgCircle key={`dot-${i}`} cx={p.x} cy={p.y} r={5} fill={Colors.neonGreen} />
+        <SvgCircle key={`dot-${i}`} cx={p.x} cy={p.y} r={5} fill={themeColor} />
       ))}
 
-      {/* Labele tekstów dopasowane do środka, nienachodzące poza obszar SVG (135) */}
+      {/* Labele tekstów dopasowane do środka */}
       {data.map((d, i) => {
         const labelPoint = getPoint(135, i);
         return (
@@ -185,10 +198,19 @@ const generatePDF = async (student: Athlete, streak: number) => {
 };
 
 export default function StudentProfile({ studentId, onClose }: StudentProfileProps) {
-  // Jeśli studentId podane (z widoku nauczyciela), użyj tego ucznia; w przeciwnym razie domyślny
-  const mockStudent: Athlete = studentId
+  // Inicjalizacja z połączoną logiką (znajdź wybranego lub domyślnego, wrzuć w stan)
+  const initialStudent: Athlete = studentId
     ? MOCK_STUDENTS.find(s => s.id === studentId) || MOCK_STUDENTS[0]
     : MOCK_STUDENTS[0];
+
+  const [student, setStudent] = useState<Athlete>(initialStudent);
+  const [isEditModalVisible, setEditModalVisible] = useState(false);
+
+  const [editForm, setEditForm] = useState({
+    weight: student.weight?.toString() || '',
+    height: student.height?.toString() || '',
+    age: student.age.toString(),
+  });
 
   const ratingScale = useRef(new Animated.Value(0)).current;
   const flamePulse = useRef(new Animated.Value(1)).current;
@@ -201,7 +223,7 @@ export default function StudentProfile({ studentId, onClose }: StudentProfilePro
       useNativeDriver: true,
     }).start();
 
-    // Animacja pulsującego płomienia (buffy SVG)
+    // Animacja pulsującego płomienia
     Animated.loop(
       Animated.sequence([
         Animated.timing(flamePulse, { toValue: 1.15, duration: 800, useNativeDriver: true }),
@@ -226,31 +248,56 @@ export default function StudentProfile({ studentId, onClose }: StudentProfilePro
 
   // Logika biznesowa Streaka
   const calculateStreak = () => {
-    const lastDate = new Date(mockStudent.lastWorkoutDate).getTime();
+    const lastDate = new Date(student.lastWorkoutDate).getTime();
     const now = new Date().getTime();
     const gapDays = Math.floor((now - lastDate) / (1000 * 3600 * 24));
 
     if (gapDays > 3) {
       return 0;
     }
-    return mockStudent.currentStreak + gapDays;
+    return student.currentStreak + gapDays;
   };
   const currentStreakValue = calculateStreak();
 
+  const bmiColor = getBMITheme(student.weight || 0, student.height || 100);
+
+  const handleSaveProfile = () => {
+    const newWeight = parseFloat(editForm.weight);
+    const newHeight = parseFloat(editForm.height);
+    const newAge = parseInt(editForm.age, 10);
+
+    if (isNaN(newWeight) || isNaN(newHeight) || isNaN(newAge)) {
+      Alert.alert("Błąd", "Wprowadź prawidłowe liczby.");
+      return;
+    }
+
+    setStudent(prev => {
+      const updated = { ...prev, weight: newWeight, height: newHeight, age: newAge };
+      if (prev.weight !== newWeight) {
+        updated.weightHistory = [
+          ...(prev.weightHistory || []),
+          { date: new Date().toISOString(), weight: newWeight }
+        ];
+      }
+      return updated;
+    });
+    setEditModalVisible(false);
+  };
+
   const radarData = [
-    { attribute: 'Szybkość', value: mockStudent.stats.speed },
-    { attribute: 'Siła', value: mockStudent.stats.strength },
-    { attribute: 'Wytrzymałość', value: mockStudent.stats.stamina },
-    { attribute: 'Skoczność', value: mockStudent.stats.jump },
-    { attribute: 'Zwinność', value: mockStudent.stats.agility },
+    { attribute: 'Szybkość', value: student.stats.speed },
+    { attribute: 'Siła', value: student.stats.strength },
+    { attribute: 'Wytrzymałość', value: student.stats.stamina },
+    { attribute: 'Skoczność', value: student.stats.jump },
+    { attribute: 'Zwinność', value: student.stats.agility },
   ];
 
   const statsArray = [
-    { label: 'Szybk.', value: mockStudent.stats.speed },
-    { label: 'Siła', value: mockStudent.stats.strength },
-    { label: 'Wytrz.', value: mockStudent.stats.stamina },
-    { label: 'Skok', value: mockStudent.stats.jump },
-    { label: 'Zwin.', value: mockStudent.stats.agility },
+    { label: 'Szybk.', value: student.stats.speed },
+    { label: 'Siła', value: student.stats.strength },
+    { label: 'Wytrz.', value: student.stats.stamina },
+    { label: 'Skok', value: student.stats.jump },
+    { label: 'Zwin.', value: student.stats.agility },
   ];
 
   const maxStat = Math.max(...statsArray.map(s => s.value));
@@ -271,12 +318,15 @@ export default function StudentProfile({ studentId, onClose }: StudentProfilePro
               <Text style={styles.avatarLargeText}>👤</Text>
             </View>
             <View style={styles.headerInfo}>
-              <Text style={styles.headerName}>{mockStudent.name}</Text>
-              <Text style={styles.headerSub}>{mockStudent.age} lat • {mockStudent.class}</Text>
+              <Text style={styles.headerName}>{student.name}</Text>
+              <Text style={styles.headerSub}>{student.age} lat • {student.class}</Text>
+              <Text style={[styles.headerSub, { color: bmiColor, fontWeight: 'bold' }]}>
+                {student.weight} kg • {student.height} cm
+              </Text>
             </View>
-            <View style={styles.schoolBadge}>
-              <Text style={{ fontSize: 20 }}>🏫</Text>
-            </View>
+            <TouchableOpacity style={styles.settingsButton} onPress={() => setEditModalVisible(true)}>
+              <Settings size={22} color={Colors.white} />
+            </TouchableOpacity>
           </View>
 
           {/* Animowany Overall (Lottie Fire.json) */}
@@ -286,27 +336,29 @@ export default function StudentProfile({ studentId, onClose }: StudentProfilePro
                 source={require('../../../assets/lottie/Fire.json')}
                 autoPlay
                 loop
+                renderMode="SOFTWARE"
+                colorFilters={[{ keypath: '**', color: bmiColor }]}
                 style={styles.lottieFlame}
               />
-              <Text style={styles.ratingText}>{mockStudent.overall}</Text>
+              <Text style={styles.ratingText}>{student.overall}</Text>
             </View>
           </Animated.View>
 
           {/* Wykres Radarowy */}
-          <NeonCard glow>
+          <NeonCard glowColor={bmiColor}>
             <View style={styles.chartContainer}>
-              <RadarChart data={radarData} size={320} />
+              <RadarChart data={radarData} size={320} themeColor={bmiColor} />
             </View>
           </NeonCard>
 
-          {/* Oczyszczone Pillsy statystyk (Bez ScrollView, pozbawione błędnego Android elevation buga) */}
+          {/* Statystyki Pillsy */}
           <View style={styles.statsPillsContainer}>
             {statsArray.map((stat, idx) => {
               const isBest = stat.value === maxStat;
               const isWorst = stat.value === minStat;
               return (
-                <View 
-                  key={stat.label + idx} 
+                <View
+                  key={stat.label + idx}
                   style={[
                     styles.statPillModern,
                     isBest && styles.statPillBest,
@@ -316,7 +368,7 @@ export default function StudentProfile({ studentId, onClose }: StudentProfilePro
                   <Text style={styles.statPillLabel}>{stat.label}</Text>
                   <Text style={[
                     styles.statPillValue,
-                    isBest && { color: Colors.neonGreen },
+                    isBest && { color: bmiColor },
                     isWorst && { color: Colors.orange }
                   ]}>
                     {stat.value}
@@ -326,7 +378,56 @@ export default function StudentProfile({ studentId, onClose }: StudentProfilePro
             })}
           </View>
 
-          {/* Streak Badge (używamy animowanego ikonki streaka tak jak overalla) */}
+          {/* Wykres Progresu Wagi */}
+          <View style={styles.sectionSpacing}>
+            <Text style={styles.sectionTitle}>⚖️ Progres Wagi</Text>
+            <NeonCard glowColor={bmiColor}>
+              <View style={{ overflow: 'hidden', paddingVertical: Spacing.md, marginLeft: -20 }}>
+                {student.weightHistory?.length > 0 ? (
+                  <LineChart
+                    data={{
+                      labels: student.weightHistory.map(w => new Date(w.date).toLocaleDateString(undefined, { month: 'short' })),
+                      datasets: [
+                        {
+                          data: student.weightHistory.map(w => w.weight)
+                        }
+                      ]
+                    }}
+                    width={screenWidth - Spacing.xl * 2 + 10}
+                    height={220}
+                    yAxisSuffix="kg"
+                    chartConfig={{
+                      backgroundColor: "transparent",
+                      backgroundGradientFrom: "transparent",
+                      backgroundGradientFromOpacity: 0,
+                      backgroundGradientTo: "transparent",
+                      backgroundGradientToOpacity: 0,
+                      decimalPlaces: 1,
+                      color: (opacity = 1) => bmiColor,
+                      labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+                      style: {
+                        borderRadius: 16
+                      },
+                      propsForDots: {
+                        r: "4",
+                        strokeWidth: "2",
+                        stroke: bmiColor
+                      }
+                    }}
+                    bezier
+                    style={{
+                      marginVertical: 8,
+                      borderRadius: 16
+                    }}
+                  />
+                ) : (
+                  <Text style={{ textAlign: 'center', color: Colors.gray }}>Brak danych wagi.</Text>
+                )}
+              </View>
+            </NeonCard>
+          </View>
+
+          {/* Streak Badge */}
           <View style={styles.sectionSpacing}>
             <NeonCard>
               <View style={styles.streakBadge}>
@@ -357,22 +458,22 @@ export default function StudentProfile({ studentId, onClose }: StudentProfilePro
             <View style={styles.badgeItem}>
               <NeonCard>
                 <View style={styles.badgeContent}>
-                  {mockStudent.avatar !== 'default.png' ? (
-                     <LottieView
-                       source={require('../../../assets/lottie/tick.json')}
-                       autoPlay
-                       loop
-                       style={{ width: 24, height: 24, marginRight: Spacing.sm }}
-                     />
+                  {student.avatar !== 'default.png' ? (
+                    <LottieView
+                      source={require('../../../assets/lottie/tick.json')}
+                      autoPlay
+                      loop
+                      style={{ width: 24, height: 24, marginRight: Spacing.sm }}
+                    />
                   ) : (
-                     <XCircle size={24} color={Colors.red} style={{ marginRight: Spacing.sm }} />
+                    <XCircle size={24} color={Colors.red} style={{ marginRight: Spacing.sm }} />
                   )}
                   <View>
-                    <Text style={[styles.badgeTitleGreen, mockStudent.avatar === 'default.png' && { color: Colors.red }]}>
+                    <Text style={[styles.badgeTitleGreen, student.avatar === 'default.png' && { color: Colors.red }]}>
                       Photo-Check
                     </Text>
                     <Text style={styles.badgeSub}>
-                      {mockStudent.avatar !== 'default.png' ? 'Zweryfikowano' : 'Brak zdjęcia'}
+                      {student.avatar !== 'default.png' ? 'Zweryfikowano' : 'Brak zdjęcia'}
                     </Text>
                   </View>
                 </View>
@@ -380,41 +481,41 @@ export default function StudentProfile({ studentId, onClose }: StudentProfilePro
             </View>
           </View>
 
-          {/* Nowa sekcja: Osiągnięcia */}
+          {/* Osiągnięcia */}
           <View style={styles.sectionSpacing}>
             <Text style={styles.sectionTitle}>🏆 Osiągnięcia</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
-               {mockStudent.recentAchievements.map(ach => (
-                 <View key={ach.id} style={styles.achievementCard}>
-                   <Text style={styles.achievementIcon}>{ach.icon}</Text>
-                   <Text style={styles.achievementTitle} numberOfLines={2}>{ach.title}</Text>
-                   <Text style={styles.achievementDate}>{new Date(ach.date).toLocaleDateString()}</Text>
-                 </View>
-               ))}
+              {student.recentAchievements.map((ach: any) => (
+                <View key={ach.id} style={styles.achievementCard}>
+                  <Text style={styles.achievementIcon}>{ach.icon}</Text>
+                  <Text style={styles.achievementTitle} numberOfLines={2}>{ach.title}</Text>
+                  <Text style={styles.achievementDate}>{new Date(ach.date).toLocaleDateString()}</Text>
+                </View>
+              ))}
             </ScrollView>
           </View>
 
-          {/* Nowa sekcja: Ostatnie Ćwiczenia */}
+          {/* Ostatnie Ćwiczenia */}
           <View style={styles.sectionSpacing}>
             <Text style={styles.sectionTitle}>📈 Ostatnie Ćwiczenia</Text>
             <View style={styles.exercisesList}>
-               {mockStudent.recentExercises.map(ex => (
-                 <View key={ex.id} style={styles.exerciseCard}>
-                   <View style={styles.exerciseInfo}>
-                      <Text style={styles.exerciseName}>{ex.name}</Text>
-                      <Text style={styles.exerciseDate}>{new Date(ex.date).toLocaleDateString()}</Text>
-                   </View>
-                   <Text style={styles.exerciseScore}>{ex.score} pkt</Text>
-                 </View>
-               ))}
+              {student.recentExercises.map((ex: any) => (
+                <View key={ex.id} style={styles.exerciseCard}>
+                  <View style={styles.exerciseInfo}>
+                    <Text style={styles.exerciseName}>{ex.name}</Text>
+                    <Text style={styles.exerciseDate}>{new Date(ex.date).toLocaleDateString()}</Text>
+                  </View>
+                  <Text style={styles.exerciseScore}>{ex.score} pkt</Text>
+                </View>
+              ))}
             </View>
           </View>
 
-          {/* Przycisk Pobierz PDF (Animowana Biegająca Ramka) */}
-          <TouchableOpacity 
-            style={styles.downloadButtonWrapper} 
+          {/* Przycisk Pobierz PDF */}
+          <TouchableOpacity
+            style={styles.downloadButtonWrapper}
             activeOpacity={0.8}
-            onPress={() => generatePDF(mockStudent, currentStreakValue)}
+            onPress={() => generatePDF(student, currentStreakValue)}
           >
             <Animated.View style={[styles.rotatingBorder, { transform: [{ rotate: spin }] }]} />
             <View style={styles.downloadButtonInner}>
@@ -424,6 +525,57 @@ export default function StudentProfile({ studentId, onClose }: StudentProfilePro
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Profil Edit Modal */}
+      <Modal visible={isEditModalVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.sectionTitle}>Edycja Profilu</Text>
+              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+                <X size={24} color={Colors.gray} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Wiek</Text>
+              <TextInput
+                style={styles.input}
+                value={editForm.age}
+                onChangeText={v => setEditForm(prev => ({ ...prev, age: v }))}
+                keyboardType="numeric"
+                placeholderTextColor={Colors.gray}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Wzrost (cm)</Text>
+              <TextInput
+                style={styles.input}
+                value={editForm.height}
+                onChangeText={v => setEditForm(prev => ({ ...prev, height: v }))}
+                keyboardType="numeric"
+                placeholderTextColor={Colors.gray}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Waga (kg)</Text>
+              <TextInput
+                style={styles.input}
+                value={editForm.weight}
+                onChangeText={v => setEditForm(prev => ({ ...prev, weight: v }))}
+                keyboardType="decimal-pad"
+                placeholderTextColor={Colors.gray}
+              />
+            </View>
+
+            <TouchableOpacity style={styles.saveBtn} onPress={handleSaveProfile}>
+              <Text style={styles.saveBtnText}>ZAPISZ</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -482,13 +634,13 @@ const styles = StyleSheet.create({
     color: Colors.gray,
     fontSize: FontSize.base,
   },
-  schoolBadge: {
+  settingsButton: {
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: Colors.cardBg,
-    borderWidth: 2,
-    borderColor: Colors.neonGreen,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -497,7 +649,6 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
     paddingTop: Spacing.md,
   },
-  // Flame Overalls
   flameWrapper: {
     width: 140,
     height: 140,
@@ -518,13 +669,12 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 8,
     zIndex: 2,
-    marginTop: 25, 
+    marginTop: 25,
   },
   chartContainer: {
     alignItems: 'center',
     paddingVertical: Spacing.lg,
   },
-  // FIXED STATS PILLS (No scroll, fitted to screen, no shadow bugs)
   statsPillsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -545,7 +695,6 @@ const styles = StyleSheet.create({
   statPillBest: {
     borderColor: Colors.neonGreen,
     backgroundColor: 'rgba(0, 230, 118, 0.15)',
-    // Usunięto shadowColor/elevation aby zlikwidować ciemny wirtualny kwadrat na obrysie!
   },
   statPillWorst: {
     borderColor: Colors.orange,
@@ -553,7 +702,7 @@ const styles = StyleSheet.create({
   },
   statPillLabel: {
     color: Colors.white,
-    fontSize: 11, // Smaller to fit 5 items comfortably
+    fontSize: 11,
     marginBottom: 4,
     opacity: 0.8,
   },
@@ -565,7 +714,6 @@ const styles = StyleSheet.create({
   sectionSpacing: {
     marginTop: Spacing.xl,
   },
-  // STREAK & BADGES
   streakBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -623,7 +771,6 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     marginTop: 2,
   },
-  // NOWE: Achievements & Exercises
   sectionTitle: {
     color: Colors.white,
     fontSize: FontSize.xl,
@@ -692,7 +839,6 @@ const styles = StyleSheet.create({
     fontSize: FontSize.lg,
     fontWeight: '800',
   },
-  // Download button
   downloadButtonWrapper: {
     width: '100%',
     height: 56,
@@ -726,4 +872,52 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontSize: FontSize.md,
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'flex-end'
+  },
+  modalContent: {
+    backgroundColor: Colors.bgDeep,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: Spacing.xl,
+    paddingBottom: Spacing.xxl,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)'
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xl
+  },
+  inputGroup: {
+    marginBottom: Spacing.lg
+  },
+  label: {
+    color: Colors.gray,
+    fontSize: FontSize.sm,
+    marginBottom: Spacing.xs,
+  },
+  input: {
+    backgroundColor: '#1E2A3A',
+    color: Colors.white,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: '#2A3B4D',
+  },
+  saveBtn: {
+    backgroundColor: Colors.neonGreen,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.full,
+    alignItems: 'center',
+    marginTop: Spacing.md,
+  },
+  saveBtnText: {
+    color: Colors.bgDeep,
+    fontWeight: 'bold',
+    fontSize: FontSize.md,
+  }
 });
