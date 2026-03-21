@@ -4,8 +4,10 @@ import { Medal, TrendingUp, TrendingDown, Flame } from 'lucide-react-native';
 import { NeonCard } from '../components/NeonCard';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../styles/theme';
 import { MOCK_STUDENTS } from '../data/MockStudents';
+import { useNavigation } from '@react-navigation/native';
 
 export default function RankingScreen() {
+  const navigation = useNavigation<any>();
   const [activeTab, setActiveTab] = useState<'week' | 'month' | 'all'>('week');
   const [refreshing, setRefreshing] = useState(false);
 
@@ -78,90 +80,99 @@ export default function RankingScreen() {
               const matchingStudent = MOCK_STUDENTS.find(s => s.name === player.name);
 
               return (
-                <NeonCard
+                <TouchableOpacity
                   key={player.rank}
-                  glow={isFirst}
-                  style={isFirst ? styles.firstPlaceCard : undefined}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    if (matchingStudent?.id) {
+                      navigation.navigate('StudentProfile', { studentId: matchingStudent.id });
+                    }
+                  }}
                 >
-                  <View
-                    style={[
-                      styles.rankingRow,
-                      isFirst && styles.rankingRowFirst,
-                    ]}
+                  <NeonCard
+                    glow={isFirst}
+                    style={isFirst ? styles.firstPlaceCard : undefined}
                   >
-                    {/* Rank/Medal */}
-                    <View style={[styles.rankBadge, isFirst && styles.rankBadgeFirst]}>
-                      {medalColor ? (
-                        <Medal
-                          size={isFirst ? 32 : 28}
-                          color={medalColor}
-                          fill={medalColor}
-                        />
-                      ) : (
-                        <Text style={[styles.rankNumber, isFirst && styles.rankNumberFirst]}>
-                          {player.rank}
-                        </Text>
-                      )}
-                    </View>
-
-                    {/* Avatar */}
                     <View
                       style={[
-                        styles.rankAvatar,
-                        isFirst && styles.rankAvatarFirst,
-                        { overflow: 'hidden', padding: 0 }
+                        styles.rankingRow,
+                        isFirst && styles.rankingRowFirst,
                       ]}
                     >
-                      {matchingStudent?.avatar && matchingStudent.avatar.startsWith('http') ? (
-                        <Image source={{ uri: matchingStudent.avatar }} style={{ width: '100%', height: '100%' }} />
-                      ) : (
-                        <Text style={{ fontSize: isFirst ? 20 : 16 }}>👤</Text>
-                      )}
-                    </View>
-
-                    {/* Name & Class */}
-                    <View style={styles.rankInfo}>
-                      <Text
-                        style={[styles.rankName, isFirst && styles.rankNameFirst]}
-                        numberOfLines={1}
-                      >
-                        {player.name}
-                      </Text>
-                      <View style={styles.rankMeta}>
-                        <Text style={styles.rankClass}>Klasa {player.class}</Text>
-                        {player.streak >= 7 && (
-                          <View style={styles.streakBadge}>
-                            <Flame size={12} color={Colors.orange} />
-                            <Text style={styles.streakText}>{player.streak}</Text>
-                          </View>
+                      {/* Rank/Medal */}
+                      <View style={[styles.rankBadge, isFirst && styles.rankBadgeFirst]}>
+                        {medalColor ? (
+                          <Medal
+                            size={isFirst ? 32 : 28}
+                            color={medalColor}
+                            fill={medalColor}
+                          />
+                        ) : (
+                          <Text style={[styles.rankNumber, isFirst && styles.rankNumberFirst]}>
+                            {player.rank}
+                          </Text>
                         )}
                       </View>
-                    </View>
 
-                    {/* Score */}
-                    <View
-                      style={[
-                        styles.scoreBadge,
-                        isFirst ? styles.scoreBadgeFirst : styles.scoreBadgeNormal,
-                      ]}
-                    >
-                      <Text
+                      {/* Avatar */}
+                      <View
                         style={[
-                          styles.scoreText,
-                          isFirst ? styles.scoreTextFirst : styles.scoreTextNormal,
+                          styles.rankAvatar,
+                          isFirst && styles.rankAvatarFirst,
+                          { overflow: 'hidden', padding: 0 }
                         ]}
                       >
-                        {player.score}
-                      </Text>
-                    </View>
+                        {matchingStudent?.avatar && matchingStudent.avatar.startsWith('http') ? (
+                          <Image source={{ uri: matchingStudent.avatar }} style={{ width: '100%', height: '100%' }} />
+                        ) : (
+                          <Text style={{ fontSize: isFirst ? 20 : 16 }}>👤</Text>
+                        )}
+                      </View>
 
-                    {/* Trend */}
-                    <View style={styles.trendContainer}>
-                      {player.trend === 'up' && <TrendingUp size={20} color={Colors.neonGreen} />}
-                      {player.trend === 'down' && <TrendingDown size={20} color={Colors.red} />}
+                      {/* Name & Class */}
+                      <View style={styles.rankInfo}>
+                        <Text
+                          style={[styles.rankName, isFirst && styles.rankNameFirst]}
+                          numberOfLines={1}
+                        >
+                          {player.name}
+                        </Text>
+                        <View style={styles.rankMeta}>
+                          <Text style={styles.rankClass}>Klasa {player.class}</Text>
+                          {player.streak >= 7 && (
+                            <View style={styles.streakBadge}>
+                              <Flame size={12} color={Colors.orange} />
+                              <Text style={styles.streakText}>{player.streak}</Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+
+                      {/* Score */}
+                      <View
+                        style={[
+                          styles.scoreBadge,
+                          isFirst ? styles.scoreBadgeFirst : styles.scoreBadgeNormal,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.scoreText,
+                            isFirst ? styles.scoreTextFirst : styles.scoreTextNormal,
+                          ]}
+                        >
+                          {player.score}
+                        </Text>
+                      </View>
+
+                      {/* Trend */}
+                      <View style={styles.trendContainer}>
+                        {player.trend === 'up' && <TrendingUp size={20} color={Colors.neonGreen} />}
+                        {player.trend === 'down' && <TrendingDown size={20} color={Colors.red} />}
+                      </View>
                     </View>
-                  </View>
-                </NeonCard>
+                  </NeonCard>
+                </TouchableOpacity>
               );
             })}
           </View>
@@ -203,9 +214,10 @@ const styles = StyleSheet.create({
   tab: {
     flex: 1,
     paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: 2,
     borderRadius: BorderRadius.full,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   tabActive: {
     backgroundColor: Colors.neonGreen,
@@ -217,8 +229,9 @@ const styles = StyleSheet.create({
   },
   tabText: {
     color: Colors.gray,
-    fontSize: FontSize.sm,
-    fontWeight: '600',
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   tabTextActive: {
     color: Colors.bgDeep,

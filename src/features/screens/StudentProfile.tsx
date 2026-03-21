@@ -332,62 +332,204 @@ Odpowiedz DOKŁADNIE w 4 punktach (po polsku):
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>Paszport Sportowy</title>
+          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
           <style>
-            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f6f8; color: #333; margin: 0; padding: 40px; }
-            .container { background-color: #fff; padding: 40px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); max-width: 800px; margin: auto; }
-            .header { text-align: center; border-bottom: 2px solid #00E676; padding-bottom: 20px; margin-bottom: 30px; }
-            .header h1 { margin: 0; color: #1E2A3A; font-size: 32px; text-transform: uppercase; letter-spacing: 2px; }
-            .header p { color: #00E676; font-size: 16px; font-weight: bold; margin: 10px 0 0; }
-            .section { margin-bottom: 30px; }
-            .section-title { font-size: 20px; color: #1E2A3A; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px; }
-            .info-grid { display: flex; flex-wrap: wrap; gap: 20px; }
-            .info-item { flex: 1 1 calc(50% - 20px); background: #f9fbfd; padding: 15px; border-radius: 8px; border-left: 4px solid #00E676; }
-            .info-label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
-            .info-value { font-size: 18px; color: #1E2A3A; font-weight: bold; }
-            .stats-grid { display: flex; flex-wrap: wrap; gap: 15px; }
-            .stat-card { flex: 1 1 calc(33.333% - 15px); background: #1E2A3A; color: #fff; text-align: center; padding: 20px; border-radius: 12px; }
-            .stat-value { font-size: 28px; font-weight: bold; color: #00E676; margin-bottom: 5px; }
-            .stat-label { font-size: 12px; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
-            .overall-card { background: linear-gradient(135deg, #00E676, #00B359); color: #fff; text-align: center; padding: 30px; border-radius: 12px; margin-top: 20px; box-shadow: 0 4px 15px rgba(0,230,118,0.3); }
-            .overall-value { font-size: 48px; font-weight: 900; margin: 0; }
-            .overall-label { font-size: 16px; text-transform: uppercase; letter-spacing: 2px; opacity: 0.9; }
+            :root {
+              --bg-dark: #0B0E14;
+              --card-bg: #151A22;
+              --neon-green: #00FF66;
+              --neon-glow: rgba(0, 255, 102, 0.4);
+              --text-main: #FFFFFF;
+              --text-muted: #8F9BB3;
+            }
+            body { 
+              font-family: 'Inter', sans-serif; 
+              background-color: var(--bg-dark); 
+              color: var(--text-main); 
+              margin: 0; 
+              padding: 0; 
+              display: flex;
+              justify-content: center;
+              background-image: radial-gradient(circle at 100% 0%, #1a2a22 0%, transparent 50%),
+                                radial-gradient(circle at 0% 100%, #15222e 0%, transparent 50%);
+            }
+            .a4-page { 
+              width: 100%; max-width: 800px;
+              min-height: 1050px;
+              padding: 50px; 
+              position: relative;
+              background: rgba(11, 14, 20, 0.95);
+              border: 1px solid #1f2937;
+              border-radius: 16px;
+              box-shadow: 0 0 40px rgba(0,0,0,0.5);
+              overflow: hidden;
+              margin: 20px auto;
+            }
+            .watermark {
+              position: absolute;
+              top: 50%; left: 50%;
+              transform: translate(-50%, -50%) rotate(-30deg);
+              font-size: 140px;
+              font-weight: 900;
+              color: rgba(255,255,255,0.02);
+              white-space: nowrap;
+              pointer-events: none;
+              text-transform: uppercase;
+              letter-spacing: 20px;
+            }
+            .header { 
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              border-bottom: 2px solid #1f2937; 
+              padding-bottom: 20px; 
+              margin-bottom: 40px; 
+            }
+            .header h1 { margin: 0; color: var(--neon-green); font-size: 38px; text-transform: uppercase; letter-spacing: 3px; font-weight: 900; text-shadow: 0 0 10px var(--neon-glow); }
+            .header p { color: var(--text-muted); font-size: 14px; text-transform: uppercase; margin: 5px 0 0; letter-spacing: 2px; }
+            .section-title { font-size: 18px; color: var(--text-main); margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; display: inline-block; padding-bottom: 5px; border-bottom: 2px solid var(--neon-green); font-weight: 800; }
+            
+            .row { display: flex; gap: 30px; margin-bottom: 40px; }
+            .col { flex: 1; }
+            
+            .info-card {
+              background: var(--card-bg);
+              padding: 25px;
+              border-radius: 12px;
+              border: 1px solid #1f2937;
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 20px;
+            }
+            .info-item { display: flex; flex-direction: column; }
+            .info-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+            .info-value { font-size: 18px; color: var(--text-main); font-weight: 600; }
+            
+            .overall-badge {
+              text-align: center;
+              background: linear-gradient(145deg, #151A22, #0B0E14);
+              border: 1px solid #1f2937;
+              border-radius: 50%;
+              width: 180px; height: 180px;
+              display: flex; flex-direction: column; align-items: center; justify-content: center;
+              margin: 0 auto;
+              box-shadow: 0 0 30px var(--neon-glow), inset 0 0 20px rgba(0,0,0,0.5);
+              position: relative;
+            }
+            .overall-badge::before {
+              content: '';
+              position: absolute;
+              top: -5px; left: -5px; right: -5px; bottom: -5px;
+              border-radius: 50%;
+              background: conic-gradient(var(--neon-green) ${dynamicOverall}%, transparent 0);
+              z-index: 1;
+            }
+            .overall-badge-inner {
+              position: relative;
+              background: var(--card-bg);
+              width: 100%; height: 100%;
+              border-radius: 50%;
+              z-index: 2;
+              display: flex; flex-direction: column; align-items: center; justify-content: center;
+            }
+            .overall-value { font-size: 58px; font-weight: 900; color: var(--neon-green); text-shadow: 0 0 15px var(--neon-glow); line-height: 1; }
+            .overall-label { font-size: 12px; text-transform: uppercase; letter-spacing: 2px; color: var(--text-muted); margin-top: 5px; }
+            
+            .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin-bottom: 40px; }
+            .stat-box {
+              background: var(--card-bg);
+              border: 1px solid #1f2937;
+              border-radius: 12px;
+              padding: 20px 10px;
+              text-align: center;
+              display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+              position: relative;
+              overflow: hidden;
+            }
+            .stat-bar-bg {
+              width: 100%; height: 4px; background: #1f2937; border-radius: 2px; margin-top: 15px; position: relative;
+            }
+            .stat-bar-fill {
+              position: absolute; top: 0; left: 0; height: 100%; background: var(--neon-green); border-radius: 2px; box-shadow: 0 0 8px var(--neon-glow);
+            }
+            .stat-val { font-size: 26px; font-weight: 800; color: var(--text-main); margin-bottom: 5px; }
+            .stat-name { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+
+            .footer { text-align: center; margin-top: 60px; padding-top: 20px; border-top: 1px solid #1f2937; color: #5c6b89; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
           </style>
         </head>
         <body>
-          <div class="container">
+          <div class="a4-page">
+            <div class="watermark">SCOUTING</div>
+            
             <div class="header">
-              <h1>Paszport Sportowy</h1>
-              <p>Raport Wyników Zawodnika</p>
+              <div>
+                <h1>Paszport Zawodnika</h1>
+                <p>Oficjalny Raport Wyników 2026</p>
+              </div>
+              <div style="text-align: right;">
+                <div style="font-size: 12px; color: var(--text-muted);">Data generowania</div>
+                <div style="font-size: 16px; font-weight: bold; color: var(--neon-green);">${new Date().toLocaleDateString('pl-PL')}</div>
+              </div>
             </div>
             
-            <div class="section">
-              <div class="section-title">Profil Zawodnika</div>
-              <div class="info-grid">
-                <div class="info-item"><div class="info-label">Imię i Nazwisko</div><div class="info-value">${student.name}</div></div>
-                <div class="info-item"><div class="info-label">Klasa/Grupa</div><div class="info-value">${student.class || '-'}</div></div>
-                <div class="info-item"><div class="info-label">Wiek</div><div class="info-value">${student.age || '-'} lat</div></div>
-                <div class="info-item"><div class="info-label">Waga / Wzrost</div><div class="info-value">${student.weight || '-'} kg / ${student.height || '-'} cm</div></div>
+            <div class="row">
+              <div class="col" style="flex: 1.5;">
+                <div class="section-title">Dane Profilowe</div>
+                <div class="info-card">
+                  <div class="info-item"><span class="info-label">Imię i Nazwisko</span><span class="info-value">${student.name}</span></div>
+                  <div class="info-item"><span class="info-label">Klasa / Grupa</span><span class="info-value">${student.class || '-'}</span></div>
+                  <div class="info-item"><span class="info-label">Wiek</span><span class="info-value">${student.age || '-'} lat</span></div>
+                  <div class="info-item"><span class="info-label">Waga / Wzrost</span><span class="info-value">${student.weight || '-'} kg / ${student.height || '-'} cm</span></div>
+                </div>
+              </div>
+              
+              <div class="col" style="display: flex; justify-content: center; align-items: center;">
+                <div class="overall-badge">
+                  <div class="overall-badge-inner">
+                    <div class="overall-value">${dynamicOverall}</div>
+                    <div class="overall-label">OVR Rating</div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div class="section">
-              <div class="section-title">Parametry Motoryczne</div>
-              <div class="stats-grid">
-                <div class="stat-card"><div class="stat-value">${speed}</div><div class="stat-label">Szybkość</div></div>
-                <div class="stat-card"><div class="stat-value">${strength}</div><div class="stat-label">Siła</div></div>
-                <div class="stat-card"><div class="stat-value">${stamina}</div><div class="stat-label">Wytrzymałość</div></div>
-                <div class="stat-card"><div class="stat-value">${jump}</div><div class="stat-label">Skoczność</div></div>
-                <div class="stat-card"><div class="stat-value">${agility}</div><div class="stat-label">Zwinność</div></div>
+            <div class="section-title">Potencjał Motoryczny</div>
+            <div class="stats-grid">
+              <div class="stat-box">
+                <div class="stat-val">${speed}</div>
+                <div class="stat-name">Szybkość</div>
+                <div class="stat-bar-bg"><div class="stat-bar-fill" style="width: ${speed}%"></div></div>
               </div>
-              
-              <div class="overall-card">
-                <div class="overall-value">${dynamicOverall}</div>
-                <div class="overall-label">Ocena Ogólna (OVR)</div>
+              <div class="stat-box">
+                <div class="stat-val">${strength}</div>
+                <div class="stat-name">Siła</div>
+                <div class="stat-bar-bg"><div class="stat-bar-fill" style="width: ${strength}%"></div></div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-val">${stamina}</div>
+                <div class="stat-name">Wytrz.</div>
+                <div class="stat-bar-bg"><div class="stat-bar-fill" style="width: ${stamina}%"></div></div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-val">${jump}</div>
+                <div class="stat-name">Skoczność</div>
+                <div class="stat-bar-bg"><div class="stat-bar-fill" style="width: ${jump}%"></div></div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-val">${agility}</div>
+                <div class="stat-name">Zwinność</div>
+                <div class="stat-bar-bg"><div class="stat-bar-fill" style="width: ${agility}%"></div></div>
               </div>
             </div>
             
-            <div style="text-align: center; margin-top: 40px; color: #888; font-size: 12px;">
-              Dokument wygenerowany wirtualnie z systemu skautingu. Wyniki mogą ulec zmianie w czasie.
+            <div class="info-card" style="display: block; margin-top: 30px;">
+              <div class="section-title" style="border: none; margin-bottom: 10px; font-size: 14px; padding: 0;">Ważne Informacje</div>
+              <p style="font-size: 12px; color: var(--text-muted); line-height: 1.6; margin: 0;">Raport ma charakter wyłącznie informacyjny i przedstawia aktualny poziom rozwoju motorycznego. Wyniki i szacunki mogły ulec poprawie lub pogorszeniu w zależności od systematyczności treningowej. W przypadku pytań skontaktuj się ze swoim trenerem szkolnym.</p>
+            </div>
+            
+            <div class="footer">
+              Wirtualny Paszport Sportowy • Generowano automatycznie przez System Skautingu
             </div>
           </div>
         </body>
