@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import StudentProfile from './StudentProfile';
 import { Flame, TrendingUp, TrendingDown, AlertTriangle, ChevronRight, Clock } from 'lucide-react-native';
@@ -148,7 +148,7 @@ export default function StudentList() {
           <View style={styles.headerRow}>
             <Text style={styles.headerTitle}>Klasa 6A</Text>
             <View style={styles.headerBadge}>
-              <Text style={styles.headerBadgeText}>{MOCK_STUDENTS.length}</Text>
+              <Text style={styles.headerBadgeText}>{students.length}</Text>
             </View>
           </View>
 
