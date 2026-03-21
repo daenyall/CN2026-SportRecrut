@@ -66,7 +66,7 @@ export const MOCK_STUDENTS: Athlete[] = [
       { date: '2026-02-01T10:00:00.000Z', weight: 48.2 },
       { date: '2026-03-01T10:00:00.000Z', weight: 48.5 },
     ],
-    avatar: 'https://ui-avatars.com/api/?name=Jakub+Kowalski&background=00E676&color=fff',
+    avatar: 'https://gameta.pl/wp-content/uploads/jakub-kowalski-pracownik-gameta-300x300.jpg',
     overall: 74,
     inSquad: true,
     stats: { speed: 85, strength: 60, stamina: 75, jump: 70, agility: 80 },
