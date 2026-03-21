@@ -78,6 +78,13 @@ function LiquidTabBar({
     outputRange: inputRange.map((i: number) => i * tabWidth + centerOffset),
     extrapolate: 'clamp',
   });
+  const teacherNavItems: NavItem[] = [
+    { Icon: Home, label: 'Dom', path: 'TeacherDashboard' },
+    { Icon: Users, label: 'Uczniowie', path: 'StudentList' },
+    { Icon: Award, label: 'Kadra', path: 'TeamRecruitment' },
+    { Icon: FileText, label: 'Raporty', path: 'ReportExport' },
+    { Icon: Map, label: 'Mapa', path: 'HeatMapScreen' },
+  ];
 
   // ── scaleX: liquid stretch between tabs ──
   // integers → 1, half-steps → 1.5

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Image, Dimensions, ScrollView, Animated } from 
 import { MapPin } from 'lucide-react-native';
 import { NeonCard } from '../components/NeonCard';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../styles/theme';
+import { useRoute } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
 
@@ -18,6 +19,8 @@ const HEAT_POINTS = [
 
 export default function HeatMapScreen() {
     const fadeAnim = useRef(new Animated.Value(0)).current;
+    const route = useRoute<any>();
+    const userType = route.params?.userType || 'student';
 
     useEffect(() => {
         Animated.timing(fadeAnim, {
@@ -109,6 +112,8 @@ export default function HeatMapScreen() {
 
             </ScrollView>
 
+            {/* Dolna Nawigacja z Twojego kodu */}
+            <BottomNav type={userType} />
         </View>
     );
 }
