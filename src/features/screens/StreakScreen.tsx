@@ -1,26 +1,27 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Animated } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Animated, ActivityIndicator } from 'react-native';
 import { Flame, Trophy, Zap, Crown } from 'lucide-react-native';
 import { NeonCard } from '../components/NeonCard';
 import { NeonIcon } from '../components/NeonIcon';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../styles/theme';
-import { updateStreak, getBonusPoints, getStreakMilestone } from '../utils/streakUtils';
+import { getBonusPoints } from '../utils/streakUtils';
+
+// FIREBASE IMPORTS
+import { auth, db } from '../config/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 export default function StreakScreen() {
   const [currentStreak, setCurrentStreak] = useState(0);
+  const [longestStreak, setLongestStreak] = useState(0);
   const [bonusPoints, setBonusPoints] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
   const counterScale = useRef(new Animated.Value(0.8)).current;
   const flameScale = useRef(new Animated.Value(1)).current;
   const progressWidth = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Load streak from AsyncStorage
-    updateStreak().then((streak) => {
-      setCurrentStreak(streak);
-      setBonusPoints(getBonusPoints(streak));
-    });
-
+    // Odpalenie animacji przy starcie ekranu
     Animated.spring(counterScale, {
       toValue: 1,
       useNativeDriver: true,
@@ -32,14 +33,41 @@ export default function StreakScreen() {
         Animated.timing(flameScale, { toValue: 1, duration: 1000, useNativeDriver: true }),
       ])
     ).start();
+
+    // Pobranie danych z Firebase
+    const fetchStreakData = async () => {
+      try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) return;
+
+        const studentDoc = await getDoc(doc(db, 'students', currentUser.uid));
+
+        if (studentDoc.exists()) {
+          const data = studentDoc.data();
+          const streak = data.currentStreak || 0;
+          const maxStreak = data.longestStreak || streak; // Jeśli brak rekordu, użyj obecnego
+
+          setCurrentStreak(streak);
+          setLongestStreak(maxStreak);
+          setBonusPoints(data.bonusPoints || getBonusPoints(streak));
+        }
+      } catch (error) {
+        console.error("Błąd pobierania danych o streaku:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchStreakData();
   }, []);
 
-  // Animate progress bar when streak changes
+  // Animacja paska postępu do odznaki
   useEffect(() => {
-    // Next milestone: 7, 14, or 30
     let nextMilestone = 7;
     if (currentStreak >= 7) nextMilestone = 14;
     if (currentStreak >= 14) nextMilestone = 30;
+
+    // Obliczanie % (zabezpieczenie by nie wyszło ponad 100%)
     const progress = Math.min((currentStreak / nextMilestone) * 100, 100);
 
     Animated.timing(progressWidth, {
@@ -54,7 +82,7 @@ export default function StreakScreen() {
     if (currentStreak < 7) return 7 - currentStreak;
     if (currentStreak < 14) return 14 - currentStreak;
     if (currentStreak < 30) return 30 - currentStreak;
-    return 0;
+    return 0; // Osiągnął wszystko
   })();
 
   const nextMilestoneLabel = (() => {
@@ -70,19 +98,22 @@ export default function StreakScreen() {
     { days: 30, label: 'Legenda Szkoły', Icon: Crown, unlocked: currentStreak >= 30 },
   ];
 
+  // Dynamiczny kalendarz pokazujący historię streaka na 30 kropkach
   const days = Array.from({ length: 30 }, (_, i) => {
+    // Uproszczony algorytm pokazujący aktywność w ostatnich X dniach
     const daysAgo = 29 - i;
-    if (daysAgo < 12) return 'active';
-    if (daysAgo >= 12 && daysAgo < 18) return 'inactive';
-    if (daysAgo >= 18) return 'active';
-    return 'inactive';
+    return daysAgo < currentStreak ? 'active' : 'inactive';
   });
 
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <View style={styles.innerPadding}>
-          <Text style={styles.screenTitle}>🔥 Twoja Passa Treningowa</Text>
+
+          <View style={styles.headerRow}>
+            <Text style={styles.screenTitle}>🔥 Twoja Passa Treningowa</Text>
+            {isLoading && <ActivityIndicator size="small" color={Colors.orange} />}
+          </View>
 
           {/* Main Streak Counter */}
           <Animated.View style={[styles.counterContainer, { transform: [{ scale: counterScale }] }]}>
@@ -92,7 +123,9 @@ export default function StreakScreen() {
                   <NeonIcon Icon={Flame} size={64} color={Colors.orange} glow />
                 </Animated.View>
                 <Text style={styles.counterNumber}>{currentStreak}</Text>
-                <Text style={styles.counterLabel}>dni z rzędu</Text>
+                <Text style={styles.counterLabel}>
+                  {currentStreak === 1 ? 'dzień z rzędu' : 'dni z rzędu'}
+                </Text>
               </View>
             </NeonCard>
           </Animated.View>
@@ -103,7 +136,9 @@ export default function StreakScreen() {
               <View style={styles.progressSection}>
                 <View style={styles.progressHeader}>
                   <Text style={styles.progressLabel}>Do odznaki {nextMilestoneLabel}</Text>
-                  <Text style={styles.progressValue}>{daysToNextMilestone} dni</Text>
+                  {daysToNextMilestone > 0 && (
+                    <Text style={styles.progressValue}>{daysToNextMilestone} dni</Text>
+                  )}
                 </View>
                 <View style={styles.progressBarBg}>
                   <Animated.View
@@ -190,7 +225,7 @@ export default function StreakScreen() {
             <View style={styles.statsItem}>
               <NeonCard>
                 <View style={styles.statsContent}>
-                  <Text style={styles.statsValueGreen}>{currentStreak}</Text>
+                  <Text style={styles.statsValueGreen}>{longestStreak}</Text>
                   <Text style={styles.statsLabel}>Rekord ever</Text>
                 </View>
               </NeonCard>
@@ -217,11 +252,16 @@ const styles = StyleSheet.create({
     padding: Spacing.xl,
     paddingTop: 60,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.xl,
+  },
   screenTitle: {
     color: Colors.white,
     fontSize: FontSize['2xl'],
     fontWeight: '800',
-    marginBottom: Spacing.xl,
   },
   counterContainer: {
     marginBottom: Spacing.xl,

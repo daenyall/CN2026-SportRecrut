@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, Alert, Modal, TextInput, Dimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, Alert, Modal, TextInput, Dimensions, ActivityIndicator } from 'react-native';
 import { Download, Flame, CheckCircle, XCircle, ArrowLeft, Settings, X } from 'lucide-react-native';
 import { NeonCard } from '../components/NeonCard';
 import { NeonIcon } from '../components/NeonIcon';
@@ -10,10 +10,12 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { LineChart } from 'react-native-chart-kit';
 
-import { MOCK_STUDENTS, Athlete } from '../data/MockStudents';
+// FIREBASE IMPORTS
+import { auth, db } from '../config/firebase';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
 interface StudentProfileProps {
-  studentId?: string;
+  studentId?: string; // Jeśli przekazane (Nauczyciel), ładuje tego ucznia. Jeśli brak (Uczeń), ładuje z auth.currentUser
   onClose?: () => void;
 }
 
@@ -21,19 +23,20 @@ const { width: screenWidth } = Dimensions.get('window');
 
 // Funkcja Helper do BMI
 const getBMITheme = (weight: number, height: number) => {
+  if (!weight || !height) return Colors.neonGreen; // Fallback
   const heightM = height / 100;
   const bmi = weight / (heightM * heightM);
   if (bmi < 18.5) return '#00C6FF';          // Niedowaga
   if (bmi >= 18.5 && bmi < 25) return Colors.neonGreen; // Norma
   if (bmi >= 25 && bmi < 30) return Colors.orange;     // Nadwaga
-  return Colors.red;                           // Otyłość
+  return Colors.red;                                   // Otyłość
 };
 
 // Radar Chart
 function RadarChart({ data, size = 320, themeColor = Colors.neonGreen }: { data: { attribute: string; value: number }[]; size?: number; themeColor?: string }) {
   const center = size / 2;
   const radius = 105;
-  const bgRadius = 155; // Idealnie okrągłe, znacznie szersze tło na całą pajęczynę
+  const bgRadius = 155;
   const angleStep = (2 * Math.PI) / data.length;
   const levels = 5;
 
@@ -58,7 +61,6 @@ function RadarChart({ data, size = 320, themeColor = Colors.neonGreen }: { data:
         </RadialGradient>
       </Defs>
 
-      {/* Idealnie okrągłe tło pod wykresem */}
       <SvgCircle cx={center} cy={center} r={bgRadius} fill="url(#grad)" />
 
       {/* Siatka */}
@@ -126,8 +128,22 @@ function RadarChart({ data, size = 320, themeColor = Colors.neonGreen }: { data:
 }
 
 // Logika PDF
-const generatePDF = async (student: Athlete, streak: number) => {
+const generatePDF = async (student: any, streak: number) => {
   try {
+    const achievementsHtml = student.recentAchievements?.length
+      ? student.recentAchievements.map((a: any) => `<li>${a.icon} ${a.title}</li>`).join('')
+      : '<li>Brak zarejestrowanych osiągnięć.</li>';
+
+    const exercisesHtml = student.testResults?.length
+      ? student.testResults.map((e: any) => `
+        <tr>
+          <td>${e.category || 'Test'}</td>
+          <td>${e.date ? new Date(e.date).toLocaleDateString() : 'Ostatnio'}</td>
+          <td>${e.result || e.sprint || e.jump || '-'}</td>
+        </tr>
+      `).join('')
+      : '<tr><td colspan="3" style="text-align:center;">Brak przeprowadzonych testów.</td></tr>';
+
     const html = `
       <html>
         <head>
@@ -149,41 +165,35 @@ const generatePDF = async (student: Athlete, streak: number) => {
         <body>
           <div class="header">
             <h1>Paszport Sportowy</h1>
-            <h2>${student.name}</h2>
-            <p>Wiek: ${student.age} | ${student.class}</p>
-            <p><strong>Overall: ${student.overall}</strong></p>
+            <h2>${student.name || 'Uczeń'}</h2>
+            <p>Wiek: ${student.age || '-'} | ${student.class || 'Brak Klasy'}</p>
+            <p><strong>Overall: ${student.overall || student.stats?.overall || 0}</strong></p>
             <p>Aktualny Streak: ${streak} dni</p>
           </div>
 
           <div class="section">
             <h2>Statystyki Główne</h2>
             <div class="stats-grid">
-              <div class="stat-box">Szybkość: <strong>${student.stats.speed}</strong></div>
-              <div class="stat-box">Siła: <strong>${student.stats.strength}</strong></div>
-              <div class="stat-box">Wytrzymałość: <strong>${student.stats.stamina}</strong></div>
-              <div class="stat-box">Skoczność: <strong>${student.stats.jump}</strong></div>
-              <div class="stat-box">Zwinność: <strong>${student.stats.agility}</strong></div>
+              <div class="stat-box">Szybkość: <strong>${student.stats?.speed || 0}</strong></div>
+              <div class="stat-box">Siła: <strong>${student.stats?.strength || 0}</strong></div>
+              <div class="stat-box">Wytrzymałość: <strong>${student.stats?.stamina || 0}</strong></div>
+              <div class="stat-box">Skoczność: <strong>${student.stats?.jump || 0}</strong></div>
+              <div class="stat-box">Zwinność: <strong>${student.stats?.agility || 0}</strong></div>
             </div>
           </div>
 
           <div class="section">
             <h2>Ostatnie Osiągnięcia</h2>
             <ul>
-              ${student.recentAchievements.map((a: any) => `<li>${a.icon} ${a.title}</li>`).join('')}
+              ${achievementsHtml}
             </ul>
           </div>
 
           <div class="section">
-            <h2>Ostatnie Ćwiczenia</h2>
+            <h2>Historia Testów</h2>
             <table>
-              <tr><th>Ćwiczenie</th><th>Data</th><th>Wynik</th></tr>
-              ${student.recentExercises.map((e: any) => `
-                <tr>
-                  <td>${e.name}</td>
-                  <td>${new Date(e.date).toLocaleDateString()}</td>
-                  <td>${e.score}</td>
-                </tr>
-              `).join('')}
+              <tr><th>Kategoria</th><th>Data</th><th>Wynik</th></tr>
+              ${exercisesHtml}
             </table>
           </div>
         </body>
@@ -198,18 +208,14 @@ const generatePDF = async (student: Athlete, streak: number) => {
 };
 
 export default function StudentProfile({ studentId, onClose }: StudentProfileProps) {
-  // Inicjalizacja z połączoną logiką (znajdź wybranego lub domyślnego, wrzuć w stan)
-  const initialStudent: Athlete = studentId
-    ? MOCK_STUDENTS.find(s => s.id === studentId) || MOCK_STUDENTS[0]
-    : MOCK_STUDENTS[0];
-
-  const [student, setStudent] = useState<Athlete>(initialStudent);
+  const [student, setStudent] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isEditModalVisible, setEditModalVisible] = useState(false);
 
   const [editForm, setEditForm] = useState({
-    weight: student.weight?.toString() || '',
-    height: student.height?.toString() || '',
-    age: student.age.toString(),
+    weight: '',
+    height: '',
+    age: '',
   });
 
   const ratingScale = useRef(new Animated.Value(0)).current;
@@ -217,13 +223,38 @@ export default function StudentProfile({ studentId, onClose }: StudentProfilePro
   const spinValue = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.spring(ratingScale, {
-      toValue: 1,
-      delay: 200,
-      useNativeDriver: true,
-    }).start();
+    const fetchStudentData = async () => {
+      try {
+        // Jeśli przekazano studentId (nauczyciel), ładujemy go. Jeśli nie, bierzemy zalogowanego usera.
+        const targetUid = studentId || auth.currentUser?.uid;
+        if (!targetUid) return;
 
-    // Animacja pulsującego płomienia
+        const docRef = doc(db, 'students', targetUid);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setStudent({ id: docSnap.id, ...data });
+
+          setEditForm({
+            weight: data.weight?.toString() || '',
+            height: data.height?.toString() || '',
+            age: data.age?.toString() || '',
+          });
+        }
+      } catch (error) {
+        console.error("Błąd pobierania profilu:", error);
+        Alert.alert("Błąd", "Nie udało się załadować danych ucznia.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchStudentData();
+
+    // Animacje
+    Animated.spring(ratingScale, { toValue: 1, delay: 200, useNativeDriver: true }).start();
+
     Animated.loop(
       Animated.sequence([
         Animated.timing(flamePulse, { toValue: 1.15, duration: 800, useNativeDriver: true }),
@@ -231,77 +262,94 @@ export default function StudentProfile({ studentId, onClose }: StudentProfilePro
       ])
     ).start();
 
-    // Rotująca ramka PDF
     Animated.loop(
-      Animated.timing(spinValue, {
-        toValue: 1,
-        duration: 3500,
-        useNativeDriver: true,
-      })
+      Animated.timing(spinValue, { toValue: 1, duration: 3500, useNativeDriver: true })
     ).start();
-  }, []);
+  }, [studentId]);
 
   const spin = spinValue.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
   });
 
-  // Logika biznesowa Streaka
-  const calculateStreak = () => {
-    const lastDate = new Date(student.lastWorkoutDate).getTime();
-    const now = new Date().getTime();
-    const gapDays = Math.floor((now - lastDate) / (1000 * 3600 * 24));
-
-    if (gapDays > 3) {
-      return 0;
-    }
-    return student.currentStreak + gapDays;
-  };
-  const currentStreakValue = calculateStreak();
-
-  const bmiColor = getBMITheme(student.weight || 0, student.height || 100);
-
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async () => {
     const newWeight = parseFloat(editForm.weight);
     const newHeight = parseFloat(editForm.height);
     const newAge = parseInt(editForm.age, 10);
 
     if (isNaN(newWeight) || isNaN(newHeight) || isNaN(newAge)) {
-      Alert.alert("Błąd", "Wprowadź prawidłowe liczby.");
+      Alert.alert("Błąd", "Wprowadź prawidłowe liczby dla wagi, wzrostu i wieku.");
       return;
     }
 
-    setStudent(prev => {
-      const updated = { ...prev, weight: newWeight, height: newHeight, age: newAge };
-      if (prev.weight !== newWeight) {
-        updated.weightHistory = [
-          ...(prev.weightHistory || []),
-          { date: new Date().toISOString(), weight: newWeight }
-        ];
-      }
-      return updated;
-    });
-    setEditModalVisible(false);
+    try {
+      const targetUid = studentId || auth.currentUser?.uid;
+      if (!targetUid) return;
+
+      const docRef = doc(db, 'students', targetUid);
+
+      const newHistoryEntry = { date: new Date().toISOString(), weight: newWeight };
+      const updatedHistory = student.weight !== newWeight
+        ? [...(student.weightHistory || []), newHistoryEntry]
+        : (student.weightHistory || []);
+
+      await updateDoc(docRef, {
+        weight: newWeight,
+        height: newHeight,
+        age: newAge,
+        weightHistory: updatedHistory
+      });
+
+      setStudent((prev: any) => ({
+        ...prev,
+        weight: newWeight,
+        height: newHeight,
+        age: newAge,
+        weightHistory: updatedHistory
+      }));
+
+      setEditModalVisible(false);
+      Alert.alert('Sukces', 'Profil zaktualizowany.');
+    } catch (error) {
+      console.error("Błąd aktualizacji: ", error);
+      Alert.alert('Błąd', 'Nie udało się zapisać zmian w bazie danych.');
+    }
   };
 
+  if (isLoading || !student) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={Colors.neonGreen} />
+      </View>
+    );
+  }
+
+  const bmiColor = getBMITheme(student.weight || 0, student.height || 0);
+  const currentStreakValue = student.currentStreak || 0;
+  const overallScore = student.overall ?? student.stats?.overall ?? 60;
+
   const radarData = [
-    { attribute: 'Szybkość', value: student.stats.speed },
-    { attribute: 'Siła', value: student.stats.strength },
-    { attribute: 'Wytrzymałość', value: student.stats.stamina },
-    { attribute: 'Skoczność', value: student.stats.jump },
-    { attribute: 'Zwinność', value: student.stats.agility },
+    { attribute: 'Szybkość', value: student.stats?.speed || 60 },
+    { attribute: 'Siła', value: student.stats?.strength || 60 },
+    { attribute: 'Wytrzymałość', value: student.stats?.stamina || 60 },
+    { attribute: 'Skoczność', value: student.stats?.jump || 60 },
+    { attribute: 'Zwinność', value: student.stats?.agility || 60 },
   ];
 
   const statsArray = [
-    { label: 'Szybk.', value: student.stats.speed },
-    { label: 'Siła', value: student.stats.strength },
-    { label: 'Wytrz.', value: student.stats.stamina },
-    { label: 'Skok', value: student.stats.jump },
-    { label: 'Zwin.', value: student.stats.agility },
+    { label: 'Szybk.', value: student.stats?.speed || 60 },
+    { label: 'Siła', value: student.stats?.strength || 60 },
+    { label: 'Wytrz.', value: student.stats?.stamina || 60 },
+    { label: 'Skok', value: student.stats?.jump || 60 },
+    { label: 'Zwin.', value: student.stats?.agility || 60 },
   ];
 
   const maxStat = Math.max(...statsArray.map(s => s.value));
   const minStat = Math.min(...statsArray.map(s => s.value));
+
+  const weightHistoryData = student.weightHistory && student.weightHistory.length > 0
+    ? student.weightHistory
+    : [{ date: new Date().toISOString(), weight: student.weight || 0 }];
 
   return (
     <View style={styles.container}>
@@ -315,13 +363,17 @@ export default function StudentProfile({ studentId, onClose }: StudentProfilePro
               </TouchableOpacity>
             )}
             <View style={styles.avatarLarge}>
-              <Text style={styles.avatarLargeText}>👤</Text>
+              {student.avatar && !student.avatar.includes('default.png') ? (
+                <Text style={styles.avatarLargeText}>👤</Text> // Zastąpić <Image> jeśli chcesz pokazywać awatar URL
+              ) : (
+                <Text style={styles.avatarLargeText}>👤</Text>
+              )}
             </View>
             <View style={styles.headerInfo}>
               <Text style={styles.headerName}>{student.name}</Text>
-              <Text style={styles.headerSub}>{student.age} lat • {student.class}</Text>
+              <Text style={styles.headerSub}>{student.age || '-'} lat • {student.class || 'Brak Klasy'}</Text>
               <Text style={[styles.headerSub, { color: bmiColor, fontWeight: 'bold' }]}>
-                {student.weight} kg • {student.height} cm
+                {student.weight || '-'} kg • {student.height || '-'} cm
               </Text>
             </View>
             <TouchableOpacity style={styles.settingsButton} onPress={() => setEditModalVisible(true)}>
@@ -329,7 +381,7 @@ export default function StudentProfile({ studentId, onClose }: StudentProfilePro
             </TouchableOpacity>
           </View>
 
-          {/* Animowany Overall (Lottie Fire.json) */}
+          {/* Animowany Overall */}
           <Animated.View style={[styles.ratingContainer, { transform: [{ scale: ratingScale }] }]}>
             <View style={styles.flameWrapper}>
               <LottieView
@@ -340,7 +392,7 @@ export default function StudentProfile({ studentId, onClose }: StudentProfilePro
                 colorFilters={[{ keypath: '**', color: bmiColor }]}
                 style={styles.lottieFlame}
               />
-              <Text style={styles.ratingText}>{student.overall}</Text>
+              <Text style={styles.ratingText}>{overallScore}</Text>
             </View>
           </Animated.View>
 
@@ -354,8 +406,8 @@ export default function StudentProfile({ studentId, onClose }: StudentProfilePro
           {/* Statystyki Pillsy */}
           <View style={styles.statsPillsContainer}>
             {statsArray.map((stat, idx) => {
-              const isBest = stat.value === maxStat;
-              const isWorst = stat.value === minStat;
+              const isBest = stat.value === maxStat && maxStat > 0;
+              const isWorst = stat.value === minStat && minStat > 0;
               return (
                 <View
                   key={stat.label + idx}
@@ -383,15 +435,11 @@ export default function StudentProfile({ studentId, onClose }: StudentProfilePro
             <Text style={styles.sectionTitle}>⚖️ Progres Wagi</Text>
             <NeonCard glowColor={bmiColor}>
               <View style={{ overflow: 'hidden', paddingVertical: Spacing.md, marginLeft: -20 }}>
-                {student.weightHistory?.length > 0 ? (
+                {weightHistoryData.length > 1 ? (
                   <LineChart
                     data={{
-                      labels: student.weightHistory.map(w => new Date(w.date).toLocaleDateString(undefined, { month: 'short' })),
-                      datasets: [
-                        {
-                          data: student.weightHistory.map(w => w.weight)
-                        }
-                      ]
+                      labels: weightHistoryData.map((w: any) => new Date(w.date).toLocaleDateString(undefined, { month: 'short' })),
+                      datasets: [{ data: weightHistoryData.map((w: any) => w.weight) }]
                     }}
                     width={screenWidth - Spacing.xl * 2 + 10}
                     height={220}
@@ -405,23 +453,14 @@ export default function StudentProfile({ studentId, onClose }: StudentProfilePro
                       decimalPlaces: 1,
                       color: (opacity = 1) => bmiColor,
                       labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-                      style: {
-                        borderRadius: 16
-                      },
-                      propsForDots: {
-                        r: "4",
-                        strokeWidth: "2",
-                        stroke: bmiColor
-                      }
+                      style: { borderRadius: 16 },
+                      propsForDots: { r: "4", strokeWidth: "2", stroke: bmiColor }
                     }}
                     bezier
-                    style={{
-                      marginVertical: 8,
-                      borderRadius: 16
-                    }}
+                    style={{ marginVertical: 8, borderRadius: 16 }}
                   />
                 ) : (
-                  <Text style={{ textAlign: 'center', color: Colors.gray }}>Brak danych wagi.</Text>
+                  <Text style={{ textAlign: 'center', color: Colors.gray }}>Potrzebujesz co najmniej 2 wpisów wagi do wygenerowania wykresu.</Text>
                 )}
               </View>
             </NeonCard>
@@ -437,7 +476,7 @@ export default function StudentProfile({ studentId, onClose }: StudentProfilePro
                   </Animated.View>
                   <Text style={styles.streakBadgeText}>{currentStreakValue} dni z rzędu</Text>
                 </View>
-                <Text style={styles.streakBadgePoints}>+240 pkt bonus</Text>
+                <Text style={styles.streakBadgePoints}>+{student.bonusPoints || 0} pkt bonus</Text>
               </View>
             </NeonCard>
           </View>
@@ -449,8 +488,8 @@ export default function StudentProfile({ studentId, onClose }: StudentProfilePro
                 <View style={styles.badgeContent}>
                   <NeonIcon Icon={Flame} size={20} color={Colors.orange} />
                   <View>
-                    <Text style={styles.badgeTitleOrange}>Underdog +15%</Text>
-                    <Text style={styles.badgeSub}>Bonus za rozwój</Text>
+                    <Text style={styles.badgeTitleOrange}>Kondycja</Text>
+                    <Text style={styles.badgeSub}>{overallScore < 75 ? 'Czas trenować!' : 'Wzorowo'}</Text>
                   </View>
                 </View>
               </NeonCard>
@@ -458,7 +497,7 @@ export default function StudentProfile({ studentId, onClose }: StudentProfilePro
             <View style={styles.badgeItem}>
               <NeonCard>
                 <View style={styles.badgeContent}>
-                  {student.avatar !== 'default.png' ? (
+                  {student.avatar && !student.avatar.includes('default.png') ? (
                     <LottieView
                       source={require('../../../assets/lottie/tick.json')}
                       autoPlay
@@ -469,11 +508,11 @@ export default function StudentProfile({ studentId, onClose }: StudentProfilePro
                     <XCircle size={24} color={Colors.red} style={{ marginRight: Spacing.sm }} />
                   )}
                   <View>
-                    <Text style={[styles.badgeTitleGreen, student.avatar === 'default.png' && { color: Colors.red }]}>
-                      Photo-Check
+                    <Text style={[styles.badgeTitleGreen, (!student.avatar || student.avatar.includes('default.png')) && { color: Colors.red }]}>
+                      Weryfikacja
                     </Text>
                     <Text style={styles.badgeSub}>
-                      {student.avatar !== 'default.png' ? 'Zweryfikowano' : 'Brak zdjęcia'}
+                      {student.avatar && !student.avatar.includes('default.png') ? 'Konto potw.' : 'Brak zdjęcia'}
                     </Text>
                   </View>
                 </View>
@@ -482,34 +521,37 @@ export default function StudentProfile({ studentId, onClose }: StudentProfilePro
           </View>
 
           {/* Osiągnięcia */}
-          <View style={styles.sectionSpacing}>
-            <Text style={styles.sectionTitle}>🏆 Osiągnięcia</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
-              {student.recentAchievements.map((ach: any) => (
-                <View key={ach.id} style={styles.achievementCard}>
-                  <Text style={styles.achievementIcon}>{ach.icon}</Text>
-                  <Text style={styles.achievementTitle} numberOfLines={2}>{ach.title}</Text>
-                  <Text style={styles.achievementDate}>{new Date(ach.date).toLocaleDateString()}</Text>
-                </View>
-              ))}
-            </ScrollView>
-          </View>
+          {student.recentAchievements && student.recentAchievements.length > 0 && (
+            <View style={styles.sectionSpacing}>
+              <Text style={styles.sectionTitle}>🏆 Osiągnięcia</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
+                {student.recentAchievements.map((ach: any, idx: number) => (
+                  <View key={idx} style={styles.achievementCard}>
+                    <Text style={styles.achievementIcon}>{ach.icon || '🏅'}</Text>
+                    <Text style={styles.achievementTitle} numberOfLines={2}>{ach.title || 'Osiągnięcie'}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          )}
 
           {/* Ostatnie Ćwiczenia */}
-          <View style={styles.sectionSpacing}>
-            <Text style={styles.sectionTitle}>📈 Ostatnie Ćwiczenia</Text>
-            <View style={styles.exercisesList}>
-              {student.recentExercises.map((ex: any) => (
-                <View key={ex.id} style={styles.exerciseCard}>
-                  <View style={styles.exerciseInfo}>
-                    <Text style={styles.exerciseName}>{ex.name}</Text>
-                    <Text style={styles.exerciseDate}>{new Date(ex.date).toLocaleDateString()}</Text>
+          {student.testResults && student.testResults.length > 0 && (
+            <View style={styles.sectionSpacing}>
+              <Text style={styles.sectionTitle}>📈 Ostatnie Testy</Text>
+              <View style={styles.exercisesList}>
+                {student.testResults.slice(0, 3).map((ex: any, idx: number) => (
+                  <View key={idx} style={styles.exerciseCard}>
+                    <View style={styles.exerciseInfo}>
+                      <Text style={styles.exerciseName}>{ex.category || 'Test'}</Text>
+                      <Text style={styles.exerciseDate}>{ex.date ? new Date(ex.date).toLocaleDateString() : 'Ostatnio'}</Text>
+                    </View>
+                    <Text style={styles.exerciseScore}>{ex.result || ex.sprint || ex.jump || '-'} pkt</Text>
                   </View>
-                  <Text style={styles.exerciseScore}>{ex.score} pkt</Text>
-                </View>
-              ))}
+                ))}
+              </View>
             </View>
-          </View>
+          )}
 
           {/* Przycisk Pobierz PDF */}
           <TouchableOpacity
@@ -544,6 +586,7 @@ export default function StudentProfile({ studentId, onClose }: StudentProfilePro
                 value={editForm.age}
                 onChangeText={v => setEditForm(prev => ({ ...prev, age: v }))}
                 keyboardType="numeric"
+                placeholder="Np. 12"
                 placeholderTextColor={Colors.gray}
               />
             </View>
@@ -555,6 +598,7 @@ export default function StudentProfile({ studentId, onClose }: StudentProfilePro
                 value={editForm.height}
                 onChangeText={v => setEditForm(prev => ({ ...prev, height: v }))}
                 keyboardType="numeric"
+                placeholder="Np. 155"
                 placeholderTextColor={Colors.gray}
               />
             </View>
@@ -566,12 +610,13 @@ export default function StudentProfile({ studentId, onClose }: StudentProfilePro
                 value={editForm.weight}
                 onChangeText={v => setEditForm(prev => ({ ...prev, weight: v }))}
                 keyboardType="decimal-pad"
+                placeholder="Np. 45"
                 placeholderTextColor={Colors.gray}
               />
             </View>
 
             <TouchableOpacity style={styles.saveBtn} onPress={handleSaveProfile}>
-              <Text style={styles.saveBtnText}>ZAPISZ</Text>
+              <Text style={styles.saveBtnText}>ZAPISZ DANE W BAZIE</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -581,343 +626,61 @@ export default function StudentProfile({ studentId, onClose }: StudentProfilePro
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.bgDeep,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 80,
-  },
-  innerPadding: {
-    padding: Spacing.xl,
-    paddingTop: 60,
-  },
-  backButton: {
-    padding: Spacing.sm,
-    marginRight: Spacing.xs,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.lg,
-    marginBottom: Spacing.xl,
-  },
-  avatarLarge: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.neonGreen,
-    shadowColor: Colors.neonGreen,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 15,
-    elevation: 8,
-  },
-  avatarLargeText: {
-    fontSize: 36,
-  },
-  headerInfo: {
-    flex: 1,
-  },
-  headerName: {
-    color: Colors.white,
-    fontSize: FontSize['2xl'],
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  headerSub: {
-    color: Colors.gray,
-    fontSize: FontSize.base,
-  },
-  settingsButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ratingContainer: {
-    alignItems: 'center',
-    marginBottom: Spacing.xl,
-    paddingTop: Spacing.md,
-  },
-  flameWrapper: {
-    width: 140,
-    height: 140,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  lottieFlame: {
-    width: 220,
-    height: 220,
-    position: 'absolute',
-  },
-  ratingText: {
-    fontSize: FontSize['6xl'],
-    color: Colors.white,
-    fontWeight: '900',
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 8,
-    zIndex: 2,
-    marginTop: 25,
-  },
-  chartContainer: {
-    alignItems: 'center',
-    paddingVertical: Spacing.lg,
-  },
-  statsPillsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    marginTop: Spacing.lg,
-  },
-  statPillModern: {
-    flex: 1,
-    marginHorizontal: 4,
-    backgroundColor: '#1E2A3A',
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#2A3B4D',
-  },
-  statPillBest: {
-    borderColor: Colors.neonGreen,
-    backgroundColor: 'rgba(0, 230, 118, 0.15)',
-  },
-  statPillWorst: {
-    borderColor: Colors.orange,
-    backgroundColor: 'rgba(255, 109, 0, 0.1)',
-  },
-  statPillLabel: {
-    color: Colors.white,
-    fontSize: 11,
-    marginBottom: 4,
-    opacity: 0.8,
-  },
-  statPillValue: {
-    color: Colors.white,
-    fontSize: FontSize.lg,
-    fontWeight: '800',
-  },
-  sectionSpacing: {
-    marginTop: Spacing.xl,
-  },
-  streakBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: Spacing.xs,
-    paddingHorizontal: Spacing.sm,
-    borderRadius: BorderRadius.full,
-    backgroundColor: '#FF6D0020',
-    borderWidth: 1,
-    borderColor: Colors.orange,
-  },
-  streakBadgeLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  streakBadgeText: {
-    color: Colors.orange,
-    fontWeight: '800',
-    fontSize: FontSize.md,
-  },
-  streakBadgePoints: {
-    color: Colors.goldDark,
-    fontWeight: '700',
-    fontSize: FontSize.sm,
-    marginRight: Spacing.sm,
-  },
-  badgesGrid: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-    marginTop: Spacing.xl,
-  },
-  badgeItem: {
-    flex: 1,
-  },
-  badgeContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.xs,
-  },
-  badgeTitleOrange: {
-    color: Colors.orange,
-    fontSize: FontSize.sm,
-    fontWeight: '800',
-  },
-  badgeTitleGreen: {
-    color: Colors.neonGreen,
-    fontSize: FontSize.sm,
-    fontWeight: '800',
-  },
-  badgeSub: {
-    color: Colors.gray,
-    fontSize: FontSize.xs,
-    marginTop: 2,
-  },
-  sectionTitle: {
-    color: Colors.white,
-    fontSize: FontSize.xl,
-    fontWeight: '800',
-    marginBottom: Spacing.md,
-    marginLeft: 4,
-  },
-  horizontalScroll: {
-    paddingBottom: Spacing.sm,
-    marginHorizontal: -Spacing.xl,
-    paddingHorizontal: Spacing.xl,
-  },
-  achievementCard: {
-    backgroundColor: '#1E2A3A',
-    borderRadius: 16,
-    padding: Spacing.md,
-    marginRight: Spacing.sm,
-    width: 120,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#2A3B4D',
-  },
-  achievementIcon: {
-    fontSize: 28,
-    marginBottom: Spacing.xs,
-  },
-  achievementTitle: {
-    color: Colors.white,
-    fontSize: FontSize.sm,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  achievementDate: {
-    color: Colors.gray,
-    fontSize: 10,
-  },
-  exercisesList: {
-    gap: Spacing.sm,
-  },
-  exerciseCard: {
-    backgroundColor: '#1E2A3A',
-    borderRadius: 16,
-    padding: Spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: '#2A3B4D',
-  },
-  exerciseInfo: {
-    flex: 1,
-  },
-  exerciseName: {
-    color: Colors.white,
-    fontSize: FontSize.md,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  exerciseDate: {
-    color: Colors.gray,
-    fontSize: FontSize.xs,
-  },
-  exerciseScore: {
-    color: Colors.neonGreen,
-    fontSize: FontSize.lg,
-    fontWeight: '800',
-  },
-  downloadButtonWrapper: {
-    width: '100%',
-    height: 56,
-    marginTop: Spacing.xxl,
-    borderRadius: 28,
-    overflow: 'hidden',
-    position: 'relative',
-    justifyContent: 'center',
-  },
-  rotatingBorder: {
-    position: 'absolute',
-    width: '200%',
-    height: 200,
-    backgroundColor: Colors.neonGreen,
-    top: -70,
-    left: -150,
-    opacity: 0.8,
-  },
-  downloadButtonInner: {
-    position: 'absolute',
-    top: 2, left: 2, right: 2, bottom: 2,
-    backgroundColor: Colors.cardBg,
-    borderRadius: 26,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-  },
-  downloadButtonText: {
-    color: Colors.white,
-    fontWeight: '800',
-    fontSize: FontSize.md,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    justifyContent: 'flex-end'
-  },
-  modalContent: {
-    backgroundColor: Colors.bgDeep,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: Spacing.xl,
-    paddingBottom: Spacing.xxl,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)'
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.xl
-  },
-  inputGroup: {
-    marginBottom: Spacing.lg
-  },
-  label: {
-    color: Colors.gray,
-    fontSize: FontSize.sm,
-    marginBottom: Spacing.xs,
-  },
-  input: {
-    backgroundColor: '#1E2A3A',
-    color: Colors.white,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: '#2A3B4D',
-  },
-  saveBtn: {
-    backgroundColor: Colors.neonGreen,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.full,
-    alignItems: 'center',
-    marginTop: Spacing.md,
-  },
-  saveBtnText: {
-    color: Colors.bgDeep,
-    fontWeight: 'bold',
-    fontSize: FontSize.md,
-  }
+  container: { flex: 1, backgroundColor: Colors.bgDeep },
+  scrollView: { flex: 1 },
+  scrollContent: { paddingBottom: 80 },
+  innerPadding: { padding: Spacing.xl, paddingTop: 60 },
+  backButton: { padding: Spacing.sm, marginRight: Spacing.xs },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.lg, marginBottom: Spacing.xl },
+  avatarLarge: { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.neonGreen, shadowColor: Colors.neonGreen, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 15, elevation: 8 },
+  avatarLargeText: { fontSize: 36 },
+  headerInfo: { flex: 1 },
+  headerName: { color: Colors.white, fontSize: FontSize['2xl'], fontWeight: '800', marginBottom: 4 },
+  headerSub: { color: Colors.gray, fontSize: FontSize.base },
+  settingsButton: { width: 48, height: 48, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
+  ratingContainer: { alignItems: 'center', marginBottom: Spacing.xl, paddingTop: Spacing.md },
+  flameWrapper: { width: 140, height: 140, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  lottieFlame: { width: 220, height: 220, position: 'absolute' },
+  ratingText: { fontSize: FontSize['6xl'], color: Colors.white, fontWeight: '900', textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 8, zIndex: 2, marginTop: 25 },
+  chartContainer: { alignItems: 'center', paddingVertical: Spacing.lg },
+  statsPillsContainer: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginTop: Spacing.lg },
+  statPillModern: { flex: 1, marginHorizontal: 4, backgroundColor: '#1E2A3A', borderRadius: 12, paddingVertical: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#2A3B4D' },
+  statPillBest: { borderColor: Colors.neonGreen, backgroundColor: 'rgba(0, 230, 118, 0.15)' },
+  statPillWorst: { borderColor: Colors.orange, backgroundColor: 'rgba(255, 109, 0, 0.1)' },
+  statPillLabel: { color: Colors.white, fontSize: 11, marginBottom: 4, opacity: 0.8 },
+  statPillValue: { color: Colors.white, fontSize: FontSize.lg, fontWeight: '800' },
+  sectionSpacing: { marginTop: Spacing.xl },
+  streakBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: Spacing.xs, paddingHorizontal: Spacing.sm, borderRadius: BorderRadius.full, backgroundColor: '#FF6D0020', borderWidth: 1, borderColor: Colors.orange },
+  streakBadgeLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  streakBadgeText: { color: Colors.orange, fontWeight: '800', fontSize: FontSize.md },
+  streakBadgePoints: { color: Colors.goldDark, fontWeight: '700', fontSize: FontSize.sm, marginRight: Spacing.sm },
+  badgesGrid: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.xl },
+  badgeItem: { flex: 1 },
+  badgeContent: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingVertical: Spacing.sm, paddingHorizontal: Spacing.xs },
+  badgeTitleOrange: { color: Colors.orange, fontSize: FontSize.sm, fontWeight: '800' },
+  badgeTitleGreen: { color: Colors.neonGreen, fontSize: FontSize.sm, fontWeight: '800' },
+  badgeSub: { color: Colors.gray, fontSize: FontSize.xs, marginTop: 2 },
+  sectionTitle: { color: Colors.white, fontSize: FontSize.xl, fontWeight: '800', marginBottom: Spacing.md, marginLeft: 4 },
+  horizontalScroll: { paddingBottom: Spacing.sm, marginHorizontal: -Spacing.xl, paddingHorizontal: Spacing.xl },
+  achievementCard: { backgroundColor: '#1E2A3A', borderRadius: 16, padding: Spacing.md, marginRight: Spacing.sm, width: 120, alignItems: 'center', borderWidth: 1, borderColor: '#2A3B4D' },
+  achievementIcon: { fontSize: 28, marginBottom: Spacing.xs },
+  achievementTitle: { color: Colors.white, fontSize: FontSize.sm, fontWeight: '700', textAlign: 'center', marginBottom: 4 },
+  exercisesList: { gap: Spacing.sm },
+  exerciseCard: { backgroundColor: '#1E2A3A', borderRadius: 16, padding: Spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#2A3B4D' },
+  exerciseInfo: { flex: 1 },
+  exerciseName: { color: Colors.white, fontSize: FontSize.md, fontWeight: '700', marginBottom: 4 },
+  exerciseDate: { color: Colors.gray, fontSize: FontSize.xs },
+  exerciseScore: { color: Colors.neonGreen, fontSize: FontSize.lg, fontWeight: '800' },
+  downloadButtonWrapper: { width: '100%', height: 56, marginTop: Spacing.xxl, borderRadius: 28, overflow: 'hidden', position: 'relative', justifyContent: 'center' },
+  rotatingBorder: { position: 'absolute', width: '200%', height: 200, backgroundColor: Colors.neonGreen, top: -70, left: -150, opacity: 0.8 },
+  downloadButtonInner: { position: 'absolute', top: 2, left: 2, right: 2, bottom: 2, backgroundColor: Colors.cardBg, borderRadius: 26, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm },
+  downloadButtonText: { color: Colors.white, fontWeight: '800', fontSize: FontSize.md },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: Colors.bgDeep, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: Spacing.xl, paddingBottom: Spacing.xxl, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.xl },
+  inputGroup: { marginBottom: Spacing.lg },
+  label: { color: Colors.gray, fontSize: FontSize.sm, marginBottom: Spacing.xs },
+  input: { backgroundColor: '#1E2A3A', color: Colors.white, padding: Spacing.md, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: '#2A3B4D' },
+  saveBtn: { backgroundColor: Colors.neonGreen, padding: Spacing.md, borderRadius: BorderRadius.full, alignItems: 'center', marginTop: Spacing.md },
+  saveBtnText: { color: Colors.bgDeep, fontWeight: 'bold', fontSize: FontSize.md }
 });
