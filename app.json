@@ -1,31 +1,27 @@
 {
   "expo": {
-    "name": "SportRecrut",
-    "slug": "sportrecrut",
+    "name": "CN2026",
+    "slug": "CN2026",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
-    "newArchEnabled": false,
+    "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0A0E1A"
+      "backgroundColor": "#ffffff"  
     },
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.sportrecrut.app",
-      "newArchEnabled": false
+      "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0A0E1A",
+        "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "package": "com.sportrecrut.app",
-      "newArchEnabled": false
+      "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
