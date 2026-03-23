@@ -79,3 +79,81 @@ System weryfikacji wyników przez zdjęcie. Napis „Zweryfikowano przez Photo-C
 
 ## 🚀 Instalacja i uruchomienie
 ```bash
+# Klonowanie repo
+git clone https://github.com/ekipa-pieronskich-legend/CN2026-SportRecrut.git
+cd CN2026-SportRecrut
+
+# Instalacja zależności
+npm install
+
+# Uruchomienie
+npx expo start
+```
+
+Zeskanuj QR kod w aplikacji **Expo Go** na Androidzie lub iOS.
+
+---
+
+## 📁 Struktura projektu
+
+```
+src/
+├── screens/
+│   ├── auth/           # Ekran logowania
+│   ├── profile/        # Profil FIFA, Streak Screen
+│   ├── tests/          # Formularz testów, GPS tracking
+│   ├── dashboard/      # Dashboard ucznia, Ranking, Mapa
+│   └── teacher/        # Panel nauczyciela, kadra, raporty
+├── components/
+│   ├── RadarChart/     # Wykres radarowy
+│   ├── LootBox/        # Animacja lootboxa, alert anomalii
+│   ├── StreakCard/     # Karta streaka
+│   └── SportPassport/  # Generator PDF
+├── data/
+│   └── mockStudents.ts
+├── utils/
+│   ├── streakUtils.ts
+│   └── anomalyUtils.ts
+└── navigation/
+    └── AppNavigator.tsx
+```
+
+---
+
+## 🗺️ Roadmap – V2
+
+- [ ] **Wizja komputerowa** – liczenie pompek i przysiadów przez kamerę
+- [ ] **Prawdziwa integracja API** z systemem Ministerstwa Sportu
+- [ ] **Rankingi między szkołami** w całym mieście
+- [ ] **Powiadomienia push** przypominające o treningu
+- [ ] **Apple Watch / WearOS** integracja
+
+---
+
+## 👥 Zespół – Burritos Banditos 🌯
+
+Projekt stworzony podczas **ZSEM Coding Night v. 20.2.6** w Nowym Sączu.
+
+| Osoba | Rola |
+|---|---|
+| Bartosz Majocha | Profil FIFA, Radar Chart, PDF Export |
+| Daniel Bałuszyński | Dashboard, Nauczyciel, Ranking, Mapa |
+| Seweryn Słowik | Testy, Gamifikacja, Lootbox, GPS |
+
+---
+
+## 🏅 Wynik
+
+**🥉 3. miejsce – ZSEM Coding Night v. 20.2.6, Nowy Sącz**
+
+Całonocny hackathon. Jeden build. Zero snu. Pełna aplikacja mobilna działająca na Androidzie i iOS z jednego kodu.
+
+---
+
+<div align="center">
+
+*Każdy talent zasługuje na szansę.* 🏆
+
+**SportRecrut** © 2026 – Burritos Banditos 🌯
+
+</div>
