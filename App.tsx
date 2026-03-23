@@ -25,7 +25,7 @@ const TeacherTab = createMaterialTopTabNavigator<TeacherTabParamList>();
 function StudentTabNavigator() {
   return (
     <StudentTab.Navigator
-      initialRouteName="StudentDashboard"
+      initialRouteName="StudentDashboard" //a
       tabBarPosition="bottom"
       tabBar={(props) => <BottomNav {...props} type="student" />}
       screenOptions={{ swipeEnabled: true, animationEnabled: true, lazy: true }}
