@@ -9,6 +9,7 @@ import LottieView from 'lottie-react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { LineChart } from 'react-native-chart-kit';
+import { useNavigation } from '@react-navigation/native';
 
 // SUPABASE
 import { supabase } from '../config/supabase';
@@ -87,6 +88,7 @@ function RadarChart({ data, size = 320, themeColor = Colors.neonGreen }: { data:
 // --- MAIN COMPONENT ---
 export default function StudentProfile({ route, studentId: propStudentId, onClose }: StudentProfileProps) {
   const studentId = propStudentId || route?.params?.studentId;
+  const navigation = useNavigation<any>();
   const [student, setStudent] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -645,6 +647,14 @@ Odpowiedz DOKŁADNIE w 4 punktach (po polsku):
             <Sparkles size={20} color={Colors.bgDeep} />
             <Text style={styles.aiButtonText}>Analiza Skautingowa AI</Text>
           </TouchableOpacity>
+
+          {/* Ustawienia Konta Button - widoczne tylko dla zalogowanego ucznia */}
+          {!propStudentId && (
+            <TouchableOpacity style={[styles.aiButton, { backgroundColor: Colors.cardBg, borderWidth: 1, borderColor: Colors.gray, marginTop: Spacing.md }]} activeOpacity={0.8} onPress={() => navigation.navigate('StudentSettings')}>
+              <Settings size={20} color={Colors.white} />
+              <Text style={[styles.aiButtonText, { color: Colors.white }]}>Ustawienia Konta</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
 

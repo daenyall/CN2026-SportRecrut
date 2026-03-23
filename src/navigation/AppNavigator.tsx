@@ -3,7 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
-import { Home, ClipboardList, User, Trophy, Map, Users, Award, FileText } from 'lucide-react-native';
+import { Home, ClipboardList, User, Trophy, Map, Users, Award, FileText, Settings } from 'lucide-react-native';
 
 // Student Screens — from features/screens
 import LoginScreen from '../features/screens/LoginScreen';
@@ -12,6 +12,7 @@ import RankingScreen from '../features/screens/RankingScreen';
 import StudentProfile from '../features/screens/StudentProfile';
 import StreakScreen from '../features/screens/StreakScreen';
 import TestForm from '../features/screens/TestForm';
+import StudentSettings from '../features/screens/StudentSettings';
 
 // Teacher Screens — from features/screens
 import TeacherDashboard from '../features/screens/TeacherDashboard';
@@ -39,6 +40,7 @@ const CustomTabBar = ({ state, descriptors, navigation, type }: any) => {
           else if (route.name === 'StudentProfile') { IconComponent = User; label = 'Profil'; }
           else if (route.name === 'RankingScreen') { IconComponent = Trophy; label = 'Ranking'; }
           else if (route.name === 'StreakScreen') { IconComponent = Map; label = 'Mapa'; }
+          else if (route.name === 'StudentSettings') { IconComponent = Settings; label = 'Opcje'; }
         } else {
           if (route.name === 'TeacherDashboard') { IconComponent = Home; label = 'Dom'; }
           else if (route.name === 'StudentList') { IconComponent = Users; label = 'Uczniowie'; }
@@ -90,6 +92,7 @@ function StudentTabs() {
       <Tab.Screen name="StudentProfile" component={StudentProfile} />
       <Tab.Screen name="RankingScreen" component={RankingScreen} />
       <Tab.Screen name="StreakScreen" component={StreakScreen} />
+      <Tab.Screen name="StudentSettings" component={StudentSettings} />
     </Tab.Navigator>
   );
 }

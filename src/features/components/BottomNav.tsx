@@ -16,6 +16,7 @@ import {
   Users,
   Award,
   FileText,
+  Settings,
 } from 'lucide-react-native';
 import { Colors } from '../../styles/theme';
 
@@ -32,6 +33,7 @@ const STUDENT_ITEMS = [
   { name: 'StudentProfile', label: 'Profil', Icon: User },
   { name: 'RankingScreen', label: 'Ranking', Icon: Trophy },
   { name: 'HeatMapScreen', label: 'Mapa', Icon: Map },
+  { name: 'StudentSettings', label: 'Opcje', Icon: Settings },
 ];
 
 const TEACHER_ITEMS = [

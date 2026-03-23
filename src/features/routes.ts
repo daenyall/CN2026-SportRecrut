@@ -6,6 +6,7 @@ export type StudentTabParamList = {
   StudentProfile: undefined;
   RankingScreen: undefined;
   HeatMapScreen: undefined;
+  StudentSettings: undefined;
 };
 
 export type TeacherTabParamList = {
