@@ -32,7 +32,8 @@ export default function RankingScreen() {
 
       // Filter to same school (or fallback to all if no school set for safety)
       let studentsInSchool = usersList.filter(u => 
-        !targetSchool || (u.school && u.school.trim().toLowerCase() === targetSchool)
+        (!targetSchool || (u.school && u.school.trim().toLowerCase() === targetSchool)) &&
+        u.is_public !== false
       );
 
       // If no real students in school yet, fallback to mock so UI doesn't look broken,

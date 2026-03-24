@@ -6,7 +6,6 @@ export type StudentTabParamList = {
   StudentProfile: undefined;
   RankingScreen: undefined;
   HeatMapScreen: undefined;
-  StudentSettings: undefined;
 };
 
 export type TeacherTabParamList = {
@@ -22,4 +21,5 @@ export type RootStackParamList = {
   StudentTabs: NavigatorScreenParams<StudentTabParamList>;
   TeacherTabs: NavigatorScreenParams<TeacherTabParamList>;
   StreakScreen: undefined;
+  StudentSettings: undefined;
 };

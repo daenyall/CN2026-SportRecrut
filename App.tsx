@@ -36,7 +36,6 @@ function StudentTabNavigator() {
       <StudentTab.Screen name="StudentProfile" component={StudentProfile} />
       <StudentTab.Screen name="RankingScreen" component={RankingScreen} />
       <StudentTab.Screen name="HeatMapScreen" component={HeatMapScreen} />
-      <StudentTab.Screen name="StudentSettings" component={StudentSettings} />
     </StudentTab.Navigator>
   );
 }
@@ -76,6 +75,7 @@ export default function App() {
         <Stack.Screen name="StudentTabs" component={StudentTabNavigator} />
         <Stack.Screen name="TeacherTabs" component={TeacherTabNavigator} />
         <Stack.Screen name="StreakScreen" component={StreakScreen} />
+        <Stack.Screen name="StudentSettings" component={StudentSettings} />
       </Stack.Navigator>
     </NavigationContainer>
   );

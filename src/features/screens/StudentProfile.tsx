@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, Alert, Modal, TextInput, Dimensions, Image, RefreshControl, ActivityIndicator } from 'react-native';
-import { Download, Flame, CheckCircle, XCircle, ArrowLeft, Settings, X, Sparkles } from 'lucide-react-native';
+import { Download, Flame, CheckCircle, XCircle, ArrowLeft, Settings, X, Sparkles, Pencil } from 'lucide-react-native';
 import { NeonCard } from '../components/NeonCard';
 import { NeonIcon } from '../components/NeonIcon';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../styles/theme';
@@ -581,7 +581,16 @@ Odpowiedz DOKŁADNIE w 4 punktach (po polsku):
               <Text style={styles.headerSub}>{student.age || '-'} lat • {student.class}</Text>
               <Text style={[styles.headerSub, { color: bmiColor, fontWeight: 'bold' }]}>{student.weight} kg • {student.height} cm</Text>
             </View>
-            <TouchableOpacity style={styles.settingsButton} onPress={() => setEditModalVisible(true)}><Settings size={22} color={Colors.white} /></TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+              <TouchableOpacity style={styles.settingsButton} onPress={() => setEditModalVisible(true)}>
+                <Pencil size={22} color={Colors.white} />
+              </TouchableOpacity>
+              {!propStudentId && (
+                <TouchableOpacity style={styles.settingsButton} onPress={() => navigation.navigate('StudentSettings')}>
+                  <Settings size={22} color={Colors.white} />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
 
           {/* Rating */}
@@ -648,13 +657,7 @@ Odpowiedz DOKŁADNIE w 4 punktach (po polsku):
             <Text style={styles.aiButtonText}>Analiza Skautingowa AI</Text>
           </TouchableOpacity>
 
-          {/* Ustawienia Konta Button - widoczne tylko dla zalogowanego ucznia */}
-          {!propStudentId && (
-            <TouchableOpacity style={[styles.aiButton, { backgroundColor: Colors.cardBg, borderWidth: 1, borderColor: Colors.gray, marginTop: Spacing.md }]} activeOpacity={0.8} onPress={() => navigation.navigate('StudentSettings')}>
-              <Settings size={20} color={Colors.white} />
-              <Text style={[styles.aiButtonText, { color: Colors.white }]}>Ustawienia Konta</Text>
-            </TouchableOpacity>
-          )}
+          {/* Sekcja konta została przeniesiona do prawego górnego rogu (ikona zębatki) */}
         </View>
       </ScrollView>
 
