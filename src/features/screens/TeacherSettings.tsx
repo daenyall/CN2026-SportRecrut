@@ -19,6 +19,7 @@ import { User, Bell, Shield, Database, Settings, LogOut, Mail, Phone, Trash2, Sa
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { NeonCard } from '../components/NeonCard';
 import { NeonIcon } from '../components/NeonIcon';
+import { NeonAlert, NeonAlertButton } from '../components/NeonAlert';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../styles/theme';
 import { supabase } from '../config/supabase';
 
@@ -26,6 +27,19 @@ export default function TeacherSettings() {
   const navigation = useNavigation();
 
   // --- STANY ---
+  // Konfiguracja własnego alertu
+  const [alertConfig, setAlertConfig] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'info' as 'success' | 'error' | 'warning' | 'info',
+    buttons: [] as NeonAlertButton[]
+  });
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info', buttons: NeonAlertButton[] = []) => {
+    setAlertConfig({ visible: true, title, message, type, buttons });
+  };
+  const closeAlert = () => setAlertConfig(prev => ({ ...prev, visible: false }));
   // Profil nauczyciela
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -93,7 +107,7 @@ export default function TeacherSettings() {
         const cleanPhone = phone.replace(/[\s-]/g, '');
         const phoneRegex = /^\+?[0-9]{9,15}$/;
         if (!phoneRegex.test(cleanPhone)) {
-          Alert.alert("Błąd", "Podaj prawidłowy numer telefonu (min. 9 cyfr).");
+          showAlert("Błąd", "Podaj prawidłowy numer telefonu (min. 9 cyfr).", "error");
           setIsSaving(false);
           return;
         }
@@ -116,23 +130,24 @@ export default function TeacherSettings() {
         });
         if (authError) throw authError;
 
-        Alert.alert(
+        showAlert(
           "Sukces",
-          "Ustawienia zapisane!\nJeśli zmieniłeś email, konieczne może być jego potwierdzenie."
+          "Ustawienia zapisane!\nJeśli zmieniłeś email, konieczne może być jego potwierdzenie.",
+          "success"
         );
       } else {
-        Alert.alert("Sukces", "Ustawienia zostały zapisane pomyślnie.");
+        showAlert("Sukces", "Ustawienia zostały zapisane pomyślnie.", "success");
       }
     } catch (e: any) {
       console.error(e);
-      Alert.alert("Błąd", e.message || "Nie udało się zapisać ustawień.");
+      showAlert("Błąd", e.message || "Nie udało się zapisać ustawień.", "error");
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleLogout = async () => {
-    Alert.alert("Wyloguj", "Czy na pewno chcesz się wylogować?", [
+    showAlert("Wyloguj", "Czy na pewno chcesz się wylogować?", "warning", [
       { text: "Anuluj", style: "cancel" },
       { text: "Wyloguj", style: "destructive", onPress: async () => {
           await supabase.auth.signOut();
@@ -144,16 +159,17 @@ export default function TeacherSettings() {
   };
 
   const handleDeleteAccount = () => {
-    Alert.alert(
+    showAlert(
       "Usuń konto",
       "Tej akcji nie można cofnąć! Czy na pewno chcesz trwale usunąć swoje konto?",
+      "error",
       [
         { text: "Anuluj", style: "cancel" },
         { text: "Usuń", style: "destructive", onPress: async () => {
             try {
                const { error } = await supabase.rpc('delete_user');
                if (error) {
-                 Alert.alert("Błąd", "Funkcja automatycznego usuwania konta nie jest dostepna. Skontaktuj się z administratorem.");
+                 showAlert("Błąd", "Funkcja automatycznego usuwania konta nie jest dostepna. Skontaktuj się z administratorem.", "error");
                } else {
                  await supabase.auth.signOut();
                  navigation.dispatch(
@@ -161,7 +177,7 @@ export default function TeacherSettings() {
                  );
                }
             } catch(e) {
-               Alert.alert("Błąd", "Funkcja usuwania konta nie jest skonfigurowana po stronie serwera.");
+               showAlert("Błąd", "Funkcja usuwania konta nie jest skonfigurowana po stronie serwera.", "error");
             }
         }}
       ]
@@ -215,11 +231,11 @@ export default function TeacherSettings() {
            .getPublicUrl(fileName);
 
         setAvatarUrl(publicUrl);
-        Alert.alert("Sukces", "Zdjęcie awatara zaktualizowane! Teraz wciśnij Zapisz Ustawienia na dole.");
+        showAlert("Sukces", "Zdjęcie awatara zaktualizowane! Teraz wciśnij Zapisz Ustawienia na dole.", "success");
       }
     } catch (e: any) {
       console.error(e);
-      Alert.alert("Błąd", "Nie udało się przesłać zdjęcia. Upewnij się, że bucket 'avatars' istnieje. " + e.message);
+      showAlert("Błąd", "Nie udało się przesłać zdjęcia. Upewnij się, że bucket 'avatars' istnieje. " + e.message, "error");
     } finally {
       setIsUploading(false);
     }
@@ -469,6 +485,15 @@ export default function TeacherSettings() {
         </View>
 
       </ScrollView>
+
+      <NeonAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        buttons={alertConfig.buttons}
+        onClose={closeAlert}
+      />
     </KeyboardAvoidingView>
   );
 }

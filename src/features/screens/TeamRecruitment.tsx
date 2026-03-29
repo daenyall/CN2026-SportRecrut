@@ -4,6 +4,7 @@ import { X, Check, Award, Bell, BellRing, Zap, TrendingUp, Plus, Star, Users, Ch
 import { NeonCard } from '../components/NeonCard';
 import { BottomNav } from '../components/BottomNav';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../styles/theme';
+import { NeonAlert, NeonAlertButton } from '../components/NeonAlert';
 
 // SUPABASE IMPORTS
 import { supabase } from '../config/supabase';
@@ -20,6 +21,20 @@ export default function TeamRecruitment() {
   const [modalSortBy, setModalSortBy] = useState<'score' | 'underdog'>('score');
 
   const [teamAssignments, setTeamAssignments] = useState<any[]>([]);
+
+  // Konfiguracja własnego alertu
+  const [alertConfig, setAlertConfig] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'info' as 'success' | 'error' | 'warning' | 'info',
+    buttons: [] as NeonAlertButton[]
+  });
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info', buttons: NeonAlertButton[] = []) => {
+    setAlertConfig({ visible: true, title, message, type, buttons });
+  };
+  const closeAlert = () => setAlertConfig(prev => ({ ...prev, visible: false }));
 
   // STANY FIREBASE
   const [schoolStudents, setSchoolStudents] = useState<any[]>([]);
@@ -79,21 +94,22 @@ export default function TeamRecruitment() {
       setFollowedStudents(followedStudents.filter(id => id !== studentId));
     } else {
       setFollowedStudents([...followedStudents, studentId]);
-      Alert.alert('Obserwujesz ucznia', 'Otrzymasz powiadomienia o jego nowych treningach i anomaliach!');
+      showAlert('Obserwujesz ucznia', 'Otrzymasz powiadomienia o jego nowych treningach i anomaliach!', 'success');
     }
   };
 
   const confirmRemoveFromTeam = (assignmentId: string, studentName: string) => {
-    Alert.alert(
+    showAlert(
       'Usuwanie z kadry',
       `Czy na pewno chcesz usunąć ucznia ${studentName} z kadry (${activeCategory})?`,
+      'warning',
       [
         { text: 'Anuluj', style: 'cancel' },
         {
           text: 'Usuń',
           style: 'destructive',
           onPress: () => {
-            setTeamAssignments(teamAssignments.filter(a => a.id !== assignmentId));
+            setTeamAssignments(prev => prev.filter(a => a.id !== assignmentId));
           }
         },
       ]
@@ -112,7 +128,7 @@ export default function TeamRecruitment() {
 
     setTeamAssignments([...teamAssignments, newAssignment]);
     setModalVisible(false);
-    Alert.alert('Dodano do kadry', `${student?.name} dodany jako ${role === 'main' ? 'Główny skład' : 'Rezerwa'} w kat. ${activeCategory}`);
+    showAlert('Dodano do kadry', `${student?.name} dodany jako ${role === 'main' ? 'Główny skład' : 'Rezerwa'} w kat. ${activeCategory}`, 'success');
   };
 
   // Filtrowanie uczniów (ukrywanie tych już dodanych)
@@ -344,6 +360,15 @@ export default function TeamRecruitment() {
           </View>
         </View>
       </Modal>
+
+      <NeonAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        buttons={alertConfig.buttons}
+        onClose={closeAlert}
+      />
     </View>
   );
 }

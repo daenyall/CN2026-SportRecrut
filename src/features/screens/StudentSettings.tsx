@@ -10,20 +10,34 @@ import {
   Platform,
   RefreshControl,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
   Image
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { User, Bell, Shield, Database, Settings, LogOut, Mail, Phone, Trash2, Save } from 'lucide-react-native';
-import { useNavigation, CommonActions } from '@react-navigation/native';
+import { CommonActions, useNavigation } from '@react-navigation/native';
 import { NeonCard } from '../components/NeonCard';
 import { NeonIcon } from '../components/NeonIcon';
+import { NeonAlert, NeonAlertButton } from '../components/NeonAlert';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../styles/theme';
 import { supabase } from '../config/supabase';
 
 export default function StudentSettings() {
   const navigation = useNavigation();
+
+  // Konfiguracja własnego alertu
+  const [alertConfig, setAlertConfig] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'info' as 'success' | 'error' | 'warning' | 'info',
+    buttons: [] as NeonAlertButton[]
+  });
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info', buttons: NeonAlertButton[] = []) => {
+    setAlertConfig({ visible: true, title, message, type, buttons });
+  };
+  const closeAlert = () => setAlertConfig(prev => ({ ...prev, visible: false }));
 
   // --- STANY ---
   // Profil
@@ -91,7 +105,7 @@ export default function StudentSettings() {
         const cleanPhone = phone.replace(/[\s-]/g, '');
         const phoneRegex = /^\+?[0-9]{9,15}$/;
         if (!phoneRegex.test(cleanPhone)) {
-          Alert.alert("Błąd", "Podaj prawidłowy numer telefonu (min. 9 cyfr).");
+          showAlert("Błąd", "Podaj prawidłowy numer telefonu (min. 9 cyfr).", "error");
           setIsSaving(false);
           return;
         }
@@ -114,23 +128,24 @@ export default function StudentSettings() {
          });
          if (authError) throw authError;
 
-         Alert.alert(
+         showAlert(
            "Sukces", 
-           "Ustawienia zapisane!\nJeśli zmieniłeś email, konieczne może być jego potwierdzenie."
+           "Ustawienia zapisane!\nJeśli zmieniłeś email, konieczne może być jego potwierdzenie.",
+           "success"
          );
       } else {
-         Alert.alert("Sukces", "Ustawienia zostały zapisane pomyślnie.");
+         showAlert("Sukces", "Ustawienia zostały zapisane pomyślnie.", "success");
       }
     } catch (e: any) {
       console.error(e);
-      Alert.alert("Błąd", e.message || "Nie udało się zapisać ustawień.");
+      showAlert("Błąd", e.message || "Nie udało się zapisać ustawień.", "error");
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleLogout = async () => {
-    Alert.alert("Wyloguj", "Czy na pewno chcesz się wylogować?", [
+    showAlert("Wyloguj", "Czy na pewno chcesz się wylogować?", "warning", [
       { text: "Anuluj", style: "cancel" },
       { text: "Wyloguj", style: "destructive", onPress: async () => {
           await supabase.auth.signOut();
@@ -142,16 +157,17 @@ export default function StudentSettings() {
   };
 
   const handleDeleteAccount = () => {
-    Alert.alert(
+    showAlert(
       "Usuń konto",
       "Tej akcji nie można cofnąć! Czy na pewno chcesz trwale usunąć swoje konto?",
+      "error",
       [
         { text: "Anuluj", style: "cancel" },
         { text: "Usuń", style: "destructive", onPress: async () => {
             try {
                const { error } = await supabase.rpc('delete_user');
                if (error) {
-                 Alert.alert("Błąd", "Funkcja automatycznego usuwania konta nie jest dostepna. Skontaktuj się z trenerem.");
+                 showAlert("Błąd", "Funkcja automatycznego usuwania konta nie jest dostepna. Skontaktuj się z trenerem.", "error");
                } else {
                  await supabase.auth.signOut();
                  navigation.dispatch(
@@ -159,7 +175,7 @@ export default function StudentSettings() {
                  );
                }
             } catch(e) {
-               Alert.alert("Błąd", "Funkcja usuwania konta nie jest skonfigurowana po stronie serwera.");
+               showAlert("Błąd", "Funkcja usuwania konta nie jest skonfigurowana po stronie serwera.", "error");
             }
         }}
       ]
@@ -216,11 +232,11 @@ export default function StudentSettings() {
            .getPublicUrl(fileName);
            
         setAvatarUrl(publicUrl);
-        Alert.alert("Sukces", "Zdjęcie awatara zaktualizowane! Teraz wciśnij Zapisz Ustawienia na dole.");
+        showAlert("Sukces", "Zdjęcie awatara zaktualizowane! Teraz wciśnij Zapisz Ustawienia na dole.", "success");
       }
     } catch (e: any) {
       console.error(e);
-      Alert.alert("Błąd", "Nie udało się przesłać zdjęcia. Upewnij się, że bucket 'avatars' istnieje." + e.message);
+      showAlert("Błąd", "Nie udało się przesłać zdjęcia. Upewnij się, że bucket 'avatars' istnieje." + e.message, "error");
     } finally {
       setIsUploading(false);
     }
@@ -456,6 +472,15 @@ export default function StudentSettings() {
         </View>
 
       </ScrollView>
+
+      <NeonAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        buttons={alertConfig.buttons}
+        onClose={closeAlert}
+      />
     </KeyboardAvoidingView>
   );
 }

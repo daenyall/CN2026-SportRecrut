@@ -17,6 +17,7 @@ import { Trophy, Mail, Lock, School, MapPin, ChevronDown, Check, ArrowLeft, User
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { NeonIcon } from '../components/NeonIcon';
+import { NeonAlert, NeonAlertButton } from '../components/NeonAlert';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../styles/theme';
 import type { RootStackParamList } from '../routes';
 
@@ -64,6 +65,20 @@ export default function LoginScreen() {
   // --- STANY UI (Role / Formularz) ---
   const [step, setStep] = useState<'role_selection' | 'auth_form'>('role_selection');
   const [role, setRole] = useState<'student' | 'teacher'>('student');
+
+  // Konfiguracja własnego alertu
+  const [alertConfig, setAlertConfig] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'info' as 'success' | 'error' | 'warning' | 'info',
+    buttons: [] as NeonAlertButton[]
+  });
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info', buttons: NeonAlertButton[] = []) => {
+    setAlertConfig({ visible: true, title, message, type, buttons });
+  };
+  const closeAlert = () => setAlertConfig(prev => ({ ...prev, visible: false }));
 
   // --- STANY FORMULARZA (Firebase) ---
   const [isLogin, setIsLogin] = useState(true);
@@ -180,15 +195,15 @@ export default function LoginScreen() {
   const validateEmail = (email: string) => /\S+@\S+\.\S+/.test(email);
 
   const handleAuth = async () => {
-    if (!email || !password) return Alert.alert('Błąd', 'Wypełnij email i hasło.');
-    if (!validateEmail(email)) return Alert.alert('Błąd', 'Podaj poprawny adres e-mail.');
+    if (!email || !password) { showAlert('Błąd', 'Wypełnij email i hasło.', 'error'); return; }
+    if (!validateEmail(email)) { showAlert('Błąd', 'Podaj poprawny adres e-mail.', 'error'); return; }
 
     if (!isLogin) {
-      if (!fullName.trim()) return Alert.alert('Błąd', 'Podaj imię i nazwisko.');
-      if (password !== confirmPassword) return Alert.alert('Błąd', 'Hasła nie są identyczne.');
-      if (password.length < 6) return Alert.alert('Błąd', 'Hasło musi mieć minimum 6 znaków.');
-      if (!isAddingNewSchool && !selectedSchool) return Alert.alert('Błąd', 'Wybierz szkołę z listy.');
-      if (isAddingNewSchool && (!newSchoolName || !newSchoolAddress)) return Alert.alert('Błąd', 'Podaj nazwę i adres nowej szkoły.');
+      if (!fullName.trim()) { showAlert('Błąd', 'Podaj imię i nazwisko.', 'error'); return; }
+      if (password !== confirmPassword) { showAlert('Błąd', 'Hasła nie są identyczne.', 'error'); return; }
+      if (password.length < 6) { showAlert('Błąd', 'Hasło musi mieć minimum 6 znaków.', 'error'); return; }
+      if (!isAddingNewSchool && !selectedSchool) { showAlert('Błąd', 'Wybierz szkołę z listy.', 'error'); return; }
+      if (isAddingNewSchool && (!newSchoolName || !newSchoolAddress)) { showAlert('Błąd', 'Podaj nazwę i adres nowej szkoły.', 'error'); return; }
     }
 
     setIsLoading(true);
@@ -275,9 +290,9 @@ export default function LoginScreen() {
         }
       }
     } catch (error: any) {
-      if (error.message?.includes('already registered')) Alert.alert('Błąd', 'Ten email jest już zarejestrowany.');
-      else if (error.message?.includes('Invalid login credentials')) Alert.alert('Błąd', 'Błędny email lub hasło.');
-      else Alert.alert('Błąd autoryzacji', error.message || 'Wystąpił nieznany błąd');
+      if (error.message?.includes('already registered')) showAlert('Błąd', 'Ten email jest już zarejestrowany.', 'error');
+      else if (error.message?.includes('Invalid login credentials')) showAlert('Błąd', 'Błędny email lub hasło.', 'error');
+      else showAlert('Błąd autoryzacji', error.message || 'Wystąpił nieznany błąd', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -471,6 +486,15 @@ export default function LoginScreen() {
 
         </Animated.View>
       </ScrollView>
+
+      <NeonAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        buttons={alertConfig.buttons}
+        onClose={closeAlert}
+      />
     </KeyboardAvoidingView>
   );
 }

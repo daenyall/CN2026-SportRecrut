@@ -19,6 +19,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MaterialTopTabNavigationProp } from '@react-navigation/material-top-tabs';
 import { NeonCard } from '../components/NeonCard';
 import { NeonIcon } from '../components/NeonIcon';
+import { NeonAlert, NeonAlertButton } from '../components/NeonAlert';
 import { AnomalyModal } from '../components/AnomalyModal';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../styles/theme';
 import type { RootStackParamList, StudentTabParamList } from '../routes';
@@ -145,6 +146,20 @@ export default function TestForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [studentData, setStudentData] = useState<any>(null);
 
+  // Konfiguracja własnego alertu
+  const [alertConfig, setAlertConfig] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'info' as 'success' | 'error' | 'warning' | 'info',
+    buttons: [] as NeonAlertButton[]
+  });
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info', buttons: NeonAlertButton[] = []) => {
+    setAlertConfig({ visible: true, title, message, type, buttons });
+  };
+  const closeAlert = () => setAlertConfig(prev => ({ ...prev, visible: false }));
+
   // Pobierz dane ucznia z Supabase
   useEffect(() => {
     const loadUser = async () => {
@@ -160,7 +175,7 @@ export default function TestForm() {
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Brak uprawnień', 'Przyznaj dostęp do galerii, aby dodać zdjęcia.');
+      showAlert('Brak uprawnień', 'Przyznaj dostęp do galerii, aby dodać zdjęcia.', 'error');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -182,7 +197,7 @@ export default function TestForm() {
 
   const addExercise = (exerciseId: string) => {
     if (activeExercises.some(ex => ex.exerciseId === exerciseId)) {
-      Alert.alert('Blokada', 'Ćwiczenie znajduje się już na liście. Dodaj serie w istniejącej karcie.');
+      showAlert('Blokada', 'Ćwiczenie znajduje się już na liście. Dodaj serie w istniejącej karcie.', 'warning');
       setIsModalVisible(false);
       return;
     }
@@ -267,7 +282,7 @@ export default function TestForm() {
 
   const handleSubmit = () => {
     if (activeExercises.length === 0) {
-      Alert.alert('Błąd', 'Dodaj co najmniej jedno ćwiczenie do weryfikacji.');
+      showAlert('Błąd', 'Dodaj co najmniej jedno ćwiczenie do weryfikacji.', 'error');
       return;
     }
 
@@ -287,14 +302,15 @@ export default function TestForm() {
     });
 
     if (hasErrors) {
-      Alert.alert('Błąd struktury danych', 'Zidentyfikowano puste lub nieliczbowe pola w seriach.');
+      showAlert('Błąd struktury danych', 'Zidentyfikowano puste lub nieliczbowe pola w seriach.', 'error');
       return;
     }
 
     if (proofImages.length === 0) {
-      Alert.alert(
+      showAlert(
         "Weryfikacja zagrożona",
         "Brak dokumentacji fotograficznej. Ryzyko odrzucenia wyników.",
+        "warning",
         [
           { text: "Anuluj", style: "cancel" },
           { text: "Wymuś wysłanie", onPress: () => processSubmit() }
@@ -424,7 +440,7 @@ export default function TestForm() {
         if (detectedAnomaly) {
           setShowAnomalyModal(true);
         } else {
-          Alert.alert('Zapis wysłany', 'Wyniki zostały przesłane. Czekają na zatwierdzenie przez nauczyciela.', [
+          showAlert('Zapis wysłany', 'Wyniki zostały przesłane. Czekają na zatwierdzenie przez nauczyciela.', 'success', [
             { text: 'OK', onPress: () => navigation.navigate('StudentProfile') },
           ]);
         }
@@ -439,17 +455,18 @@ export default function TestForm() {
           ? `\nNowa ranga: ${getRankDisplay(highestRankReward)} 🎖️`
           : '';
 
-        Alert.alert(
+        showAlert(
           '🏆 Nowe Osiągnięcie!',
           `Zdobyto: ${medalNames}${rankMsg}`,
-          [{ text: 'Super!', onPress: showAnomalyCheck }],
+          'success',
+          [{ text: 'Super!', onPress: showAnomalyCheck }]
         );
       } else {
         showAnomalyCheck();
       }
     } catch (error) {
       console.error('Błąd wysyłki:', error);
-      Alert.alert('Błąd', 'Nie udało się wysłać wyników. Sprawdź połączenie i spróbuj ponownie.');
+      showAlert('Błąd', 'Nie udało się wysłać wyników. Sprawdź połączenie i spróbuj ponownie.', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -648,7 +665,7 @@ export default function TestForm() {
           navigation.navigate('StudentProfile');
         }}
         onConfirm={() => {
-          Alert.alert('Status', 'Wysłano pomyślnie. Wynik czeka na weryfikację nauczyciela.', [
+          showAlert('Status', 'Wysłano pomyślnie. Wynik czeka na weryfikację nauczyciela.', 'success', [
             { text: 'OK', onPress: () => navigation.navigate('StudentProfile') }
           ]);
         }}
@@ -687,6 +704,15 @@ export default function TestForm() {
           </View>
         </View>
       </Modal>
+
+      <NeonAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        buttons={alertConfig.buttons}
+        onClose={closeAlert}
+      />
     </View>
   );
 }

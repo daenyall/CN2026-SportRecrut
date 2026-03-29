@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIn
 import { Download, Send, FileText, CheckCircle, School, Database, RefreshCw } from 'lucide-react-native';
 import { NeonCard } from '../components/NeonCard';
 import { NeonIcon } from '../components/NeonIcon';
+import { NeonAlert, NeonAlertButton } from '../components/NeonAlert';
 
 import { Colors, Spacing, FontSize, BorderRadius } from '../../styles/theme';
 
@@ -25,6 +26,20 @@ export default function ReportExport() {
   const [averageScore, setAverageScore] = useState(0);
   const [totalStreaks, setTotalStreaks] = useState(0);
   const [studentsList, setStudentsList] = useState<any[]>([]);
+
+  // Konfiguracja własnego alertu
+  const [alertConfig, setAlertConfig] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'info' as 'success' | 'error' | 'warning' | 'info',
+    buttons: [] as NeonAlertButton[]
+  });
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info', buttons: NeonAlertButton[] = []) => {
+    setAlertConfig({ visible: true, title, message, type, buttons });
+  };
+  const closeAlert = () => setAlertConfig(prev => ({ ...prev, visible: false }));
 
   const reportItems = [
     `Zestawienie uczniów (${totalStudents})`,
@@ -319,7 +334,7 @@ export default function ReportExport() {
 
   const handleGeneratePDF = async () => {
     if (totalStudents === 0) {
-      Alert.alert('Brak danych', 'Nie masz jeszcze uczniów w swojej placówce. Raport byłby pusty!');
+      showAlert('Brak danych', 'Nie masz jeszcze uczniów w swojej placówce. Raport byłby pusty!', 'warning');
       return;
     }
 
@@ -336,23 +351,24 @@ export default function ReportExport() {
           UTI: 'com.adobe.pdf',
         });
       } else {
-        Alert.alert('Sukces', 'Raport wygenerowany. Zapisano pomyślnie na urządzeniu!');
+        showAlert('Sukces', 'Raport wygenerowany. Zapisano pomyślnie na urządzeniu!', 'success');
       }
     } catch (e) {
       console.error(e);
-      Alert.alert('Błąd', 'Wystąpił błąd podczas generowania pliku PDF.');
+      showAlert('Błąd', 'Wystąpił błąd podczas generowania pliku PDF.', 'error');
     }
   };
 
   const handleSendToMinistry = () => {
     if (totalStudents === 0) {
-      Alert.alert('Brak danych', 'Nie masz jeszcze uczniów do wygenerowania raportu dla Ministerstwa.');
+      showAlert('Brak danych', 'Nie masz jeszcze uczniów do wygenerowania raportu dla Ministerstwa.', 'warning');
       return;
     }
 
-    Alert.alert(
+    showAlert(
       'Potwierdź Wysyłkę',
       'Czy na pewno chcesz przesłać aktualny raport do weryfikacji przez system Ministerstwa Sportu?',
+      'warning',
       [
         { text: 'Anuluj', style: 'cancel' },
         { 
@@ -372,11 +388,11 @@ export default function ReportExport() {
                   attachments: [uri],
                 });
               } else {
-                Alert.alert('Błąd Oprogramowania', 'Nie znaleziono domyślnego klienta poczty. Skonfiguruj e-mail w telefonie lub udostępnij pobrany plik PDF ręcznie.');
+                showAlert('Błąd', 'Nie znaleziono domyślnego klienta poczty. Skonfiguruj e-mail w telefonie lub udostępnij pobrany plik PDF ręcznie.', 'error');
               }
             } catch (error) {
               console.error(error);
-              Alert.alert('Błąd', 'Nie powiodło się wywołanie klienta pocztowego.');
+              showAlert('Błąd', 'Nie powiodło się wywołanie klienta pocztowego.', 'error');
             }
           } 
         }
@@ -532,6 +548,14 @@ export default function ReportExport() {
         </View>
       </ScrollView>
 
+      <NeonAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        buttons={alertConfig.buttons}
+        onClose={closeAlert}
+      />
     </View>
   );
 }

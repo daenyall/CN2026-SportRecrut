@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, Alert, 
 import { Download, Flame, CheckCircle, XCircle, ArrowLeft, Settings, X, Sparkles, Pencil } from 'lucide-react-native';
 import { NeonCard } from '../components/NeonCard';
 import { NeonIcon } from '../components/NeonIcon';
+import { NeonAlert, NeonAlertButton } from '../components/NeonAlert';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../styles/theme';
 import Svg, { Polygon, Circle as SvgCircle, Text as SvgText, Line, Defs, RadialGradient, Stop } from 'react-native-svg';
 import LottieView from 'lottie-react-native';
@@ -96,6 +97,20 @@ export default function StudentProfile({ route, studentId: propStudentId, onClos
   const [isAiModalVisible, setAiModalVisible] = useState(false);
   const [isAiLoading, setAiLoading] = useState(false);
   const [aiSummary, setAiSummary] = useState('');
+
+  // Konfiguracja własnego alertu
+  const [alertConfig, setAlertConfig] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'info' as 'success' | 'error' | 'warning' | 'info',
+    buttons: [] as NeonAlertButton[]
+  });
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info', buttons: NeonAlertButton[] = []) => {
+    setAlertConfig({ visible: true, title, message, type, buttons });
+  };
+  const closeAlert = () => setAlertConfig(prev => ({ ...prev, visible: false }));
 
   const [editForm, setEditForm] = useState({ weight: '', height: '', age: '' });
 
@@ -195,7 +210,7 @@ export default function StudentProfile({ route, studentId: propStudentId, onClos
     const newAge = parseInt(editForm.age, 10);
 
     if (isNaN(newWeight) || isNaN(newHeight) || isNaN(newAge)) {
-      Alert.alert("Błąd", "Wprowadź prawidłowe dane.");
+      showAlert("Błąd", "Wprowadź prawidłowe dane.", "error");
       return;
     }
 
@@ -214,8 +229,8 @@ export default function StudentProfile({ route, studentId: propStudentId, onClos
       if (error) throw error;
       setStudent((prev: any) => ({ ...prev, weight: newWeight, height: newHeight, age: newAge, weightHistory: updatedHistory }));
       setEditModalVisible(false);
-      Alert.alert('Sukces', 'Profil zaktualizowany.');
-    } catch (e) { Alert.alert('Błąd zapisu'); }
+      showAlert('Sukces', 'Profil zaktualizowany.', "success");
+    } catch (e) { showAlert('Błąd', 'Błąd zapisu', "error"); }
   };
 
   const fetchAiSummary = async () => {
@@ -554,7 +569,7 @@ Odpowiedz DOKŁADNIE w 4 punktach (po polsku):
       await Sharing.shareAsync(uri, { dialogTitle: 'Pobierz Paszport PDF' });
     } catch (error) {
       console.error('Błąd generowania PDF:', error);
-      Alert.alert('Błąd', 'Nie udało się wygenerować dokumentu PDF.');
+      showAlert('Błąd', 'Nie udało się wygenerować dokumentu PDF.', "error");
     }
   };
 
@@ -701,6 +716,15 @@ Odpowiedz DOKŁADNIE w 4 punktach (po polsku):
           </View>
         </View>
       </Modal>
+
+      <NeonAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        buttons={alertConfig.buttons}
+        onClose={closeAlert}
+      />
     </View>
   );
 }
