@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, Image, ActivityIndicator, RefreshControl } from 'react-native';
-import { BarChart3, Play, Trophy, Map, Flame, Gift, LogOut } from 'lucide-react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, Image, ActivityIndicator, RefreshControl, Easing } from 'react-native';
+import { BarChart3, Play, Trophy, Map, Flame, Gift, LogOut, ClipboardList, User, MapPin } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, CompositeNavigationProp, CommonActions } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MaterialTopTabNavigationProp } from '@react-navigation/material-top-tabs';
@@ -33,6 +34,15 @@ export default function StudentDashboard() {
   const headerTranslateX = useRef(new Animated.Value(-20)).current;
   const avatarScale = useRef(new Animated.Value(0)).current;
   const flameScale = useRef(new Animated.Value(1)).current;
+
+  // STREAK GRADIENT ANIMATION
+  const gradientShift = useRef(new Animated.Value(0)).current;
+
+  // LOOTBOX SHAKE ANIMATION
+  const lootboxShake = useRef(new Animated.Value(0)).current;
+
+  // NAV ICON SHINE SWEEP ANIMATION
+  const navShine = useRef(new Animated.Value(0)).current;
 
   // FUNKCJA POBIERANIA DANYCH
   const fetchStudentData = async () => {
@@ -103,20 +113,72 @@ export default function StudentDashboard() {
 
     Animated.loop(
       Animated.sequence([
-        Animated.timing(flameScale, { toValue: 1.1, duration: 1000, useNativeDriver: true }),
-        Animated.timing(flameScale, { toValue: 1, duration: 1000, useNativeDriver: true }),
+        Animated.timing(flameScale, { toValue: 1.15, duration: 800, useNativeDriver: true }),
+        Animated.timing(flameScale, { toValue: 1, duration: 800, useNativeDriver: true }),
+      ])
+    ).start();
+
+    // Animated gradient shift for streak card
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(gradientShift, { toValue: 1, duration: 3000, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+        Animated.timing(gradientShift, { toValue: 0, duration: 3000, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+      ])
+    ).start();
+
+    // Lootbox gift icon shake animation – fast, subtle, aesthetic
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(lootboxShake, { toValue: 1, duration: 80, easing: Easing.linear, useNativeDriver: true }),
+        Animated.timing(lootboxShake, { toValue: -1, duration: 80, easing: Easing.linear, useNativeDriver: true }),
+        Animated.timing(lootboxShake, { toValue: 1, duration: 80, easing: Easing.linear, useNativeDriver: true }),
+        Animated.timing(lootboxShake, { toValue: -1, duration: 80, easing: Easing.linear, useNativeDriver: true }),
+        Animated.timing(lootboxShake, { toValue: 0, duration: 60, easing: Easing.linear, useNativeDriver: true }),
+        Animated.delay(2400),
+      ])
+    ).start();
+
+    // Nav icon white shine sweep – fires every ~5s, fast sweep
+    Animated.loop(
+      Animated.sequence([
+        Animated.delay(4500),
+        Animated.timing(navShine, { toValue: 1, duration: 500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(navShine, { toValue: 0, duration: 0, useNativeDriver: true }),
       ])
     ).start();
 
     fetchStudentData();
   }, []);
 
+  // Nav cards with lucide icons instead of emojis
   const navCards = [
-    { emoji: '📝', label: 'Nowy Test', path: 'TestForm' as const },
-    { emoji: '👤', label: 'Profil', path: 'StudentProfile' as const },
-    { emoji: '🏆', label: 'Ranking', path: 'RankingScreen' as const },
-    { emoji: '🗺️', label: 'Mapa', path: 'HeatMapScreen' as const },
+    { icon: ClipboardList, iconColor: '#4FC3F7', label: 'Nowy Test', path: 'TestForm' as const },
+    { icon: User, iconColor: '#AB47BC', label: 'Profil', path: 'StudentProfile' as const },
+    { icon: Trophy, iconColor: '#FFD740', label: 'Ranking', path: 'RankingScreen' as const },
+    { icon: MapPin, iconColor: '#66BB6A', label: 'Mapa', path: 'HeatMapScreen' as const },
   ];
+
+  // Interpolate gradient shift for animated start/end positions
+  const gradientStartX = gradientShift.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.3],
+  });
+  const gradientEndX = gradientShift.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0.7],
+  });
+
+  // Lootbox shake interpolation
+  const lootboxRotate = lootboxShake.interpolate({
+    inputRange: [-1, 0, 1],
+    outputRange: ['-4deg', '0deg', '4deg'],
+  });
+
+  // Nav icon shine sweep translateX: -80 (off-left) → +80 (off-right)
+  const navShineTranslateX = navShine.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-80, 80],
+  });
 
   return (
     <View style={styles.container}>
@@ -151,34 +213,79 @@ export default function StudentDashboard() {
           </View>
         </View>
 
-        {/* Streak Card */}
+        {/* Streak Card — animated gradient background */}
         <View style={styles.section}>
-          <NeonCard glow onClick={() => navigation.navigate('StreakScreen')}>
-            <View style={styles.streakRow}>
-              <View style={styles.streakLeft}>
-                <Animated.View style={{ transform: [{ scale: flameScale }] }}>
-                  <NeonIcon Icon={Flame} size={48} color={Colors.orange} glow />
-                </Animated.View>
-                <View>
-                  <Text style={styles.streakNumber}>{streak}</Text>
-                  <Text style={styles.streakLabel}>{streak === 1 ? 'dzień z rzędu' : 'dni z rzędu'}</Text>
-                  <Text style={styles.streakSub}>
-                    {streak > 0 ? 'Nie przerywaj! Kolejny trening przed Tobą' : 'Zacznij swoją pierwszą passę!'}
-                  </Text>
+          <TouchableOpacity activeOpacity={0.85} onPress={() => navigation.navigate('StreakScreen')}>
+            <LinearGradient
+              colors={['#FF8C00', '#FFB300', '#FF6D00', '#FFCA28']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.streakGradientCard}
+            >
+              {/* Animated shimmer overlay */}
+              <Animated.View
+                style={[
+                  styles.streakShimmer,
+                  {
+                    opacity: gradientShift.interpolate({
+                      inputRange: [0, 0.5, 1],
+                      outputRange: [0.08, 0.25, 0.08],
+                    }),
+                  },
+                ]}
+              />
+              <View style={styles.streakRow}>
+                <View style={styles.streakLeft}>
+                  <Animated.View style={[styles.flameContainer, { transform: [{ scale: flameScale }] }]}>
+                    <Flame size={52} color="#FFFFFF" strokeWidth={2.5} fill="#FFFFFFBB" />
+                  </Animated.View>
+                  <View>
+                    <Text style={styles.streakNumber}>{streak}</Text>
+                    <Text style={styles.streakLabel}>{streak === 1 ? 'dzień z rzędu' : 'dni z rzędu'}</Text>
+                    <Text style={styles.streakSub}>
+                      {streak > 0 ? 'Nie przerywaj! Kolejny trening przed Tobą' : 'Zacznij swoją pierwszą passę!'}
+                    </Text>
+                  </View>
                 </View>
               </View>
-            </View>
-          </NeonCard>
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
 
-        {/* Nav Grid */}
+        {/* Nav Grid — icons instead of emojis */}
         <View style={styles.section}>
           <View style={styles.navGrid}>
-            {navCards.map((card) => (
+            {navCards.map((card, idx) => (
               <View key={card.label} style={styles.navGridItem}>
                 <NeonCard onClick={() => navigation.navigate(card.path)}>
                   <View style={styles.navCardContent}>
-                    <Text style={styles.navEmoji}>{card.emoji}</Text>
+                    <View style={[styles.navIconWrapper, { backgroundColor: `${card.iconColor}18` }]}>
+                      <card.icon size={28} color={card.iconColor} strokeWidth={2} />
+                      {/* White shine sweep overlay */}
+                      <Animated.View
+                        style={[
+                          styles.shineSweep,
+                          {
+                            transform: [
+                              {
+                                translateX: navShine.interpolate({
+                                  inputRange: [0, 1],
+                                  outputRange: [-80, 80],
+                                }),
+                              },
+                            ],
+                          },
+                        ]}
+                        pointerEvents="none"
+                      >
+                        <LinearGradient
+                          colors={['transparent', 'rgba(255,255,255,0.45)', 'transparent']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.shineGradient}
+                        />
+                      </Animated.View>
+                    </View>
                     <Text style={styles.navLabel}>{card.label}</Text>
                   </View>
                 </NeonCard>
@@ -219,13 +326,15 @@ export default function StudentDashboard() {
           </View>
         </View>
 
-        {/* Lootbox Banner */}
+        {/* Lootbox Banner — no emoji, icon with shake animation */}
         <View style={styles.section}>
           <NeonCard glow>
             <View style={styles.lootboxRow}>
-              <NeonIcon Icon={Gift} size={32} color={Colors.gold} glow />
+              <Animated.View style={{ transform: [{ rotate: lootboxRotate }] }}>
+                <NeonIcon Icon={Gift} size={34} color={Colors.gold} glow />
+              </Animated.View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.lootboxText}>🎁 Zdobądź Lootbox za dzisiejszy test!</Text>
+                <Text style={styles.lootboxText}>Zdobądź Lootbox za dzisiejszy test!</Text>
               </View>
             </View>
             <TouchableOpacity style={styles.lootboxButton} onPress={() => navigation.navigate('TestForm')}>
@@ -248,17 +357,67 @@ const styles = StyleSheet.create({
   avatarText: { fontSize: 20 },
   logoutButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255, 71, 87, 0.1)', borderWidth: 1, borderColor: 'rgba(255, 71, 87, 0.3)', alignItems: 'center', justifyContent: 'center' },
   section: { paddingHorizontal: Spacing.xl, marginBottom: Spacing.xl },
+
+  // Streak section — gradient card
+  streakGradientCard: {
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg + 4,
+    overflow: 'hidden',
+    shadowColor: '#FF8C00',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  streakShimmer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.lg,
+  },
   streakRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   streakLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.lg },
-  streakNumber: { fontSize: FontSize['6xl'], color: Colors.orange, fontWeight: '800' },
-  streakLabel: { color: Colors.white, fontSize: FontSize.sm, fontWeight: '600' },
-  streakSub: { color: Colors.gray, fontSize: FontSize.xs, marginTop: 4 },
+  flameContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  streakNumber: { fontSize: FontSize['6xl'], color: '#FFFFFF', fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.25)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
+  streakLabel: { color: '#FFFFFFEE', fontSize: FontSize.sm, fontWeight: '700', letterSpacing: 0.4 },
+  streakSub: { color: 'rgba(255,255,255,0.8)', fontSize: FontSize.xs, marginTop: 4 },
+
+  // Nav Grid
   navGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.lg },
   navGridItem: { width: '47%' },
   navCardContent: { alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing.lg },
-  navEmoji: { fontSize: 36, marginBottom: Spacing.sm },
+  navIconWrapper: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.sm + 2,
+    overflow: 'hidden',
+    position: 'relative' as const,
+  },
+  shineSweep: {
+    position: 'absolute' as const,
+    top: -4,
+    bottom: -4,
+    width: 28,
+  },
+  shineGradient: {
+    flex: 1,
+    width: '100%',
+  },
   navLabel: { color: Colors.white, fontSize: FontSize.sm, fontWeight: '600', textAlign: 'center' },
+
+  // Section title
   sectionTitle: { color: Colors.white, fontSize: FontSize.lg, fontWeight: '700', marginBottom: Spacing.md },
+
+  // Activity
   activityList: { gap: Spacing.md },
   activityRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   activityTest: { color: Colors.white, fontSize: FontSize.sm, fontWeight: '600' },
@@ -266,6 +425,8 @@ const styles = StyleSheet.create({
   activityRight: { alignItems: 'flex-end' },
   activityResult: { color: Colors.neonGreen, fontSize: FontSize.lg, fontWeight: '700' },
   activityTrend: { color: Colors.gray, fontSize: FontSize.xs },
+
+  // Lootbox
   lootboxRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   lootboxText: { color: Colors.white, fontSize: FontSize.sm, fontWeight: '600' },
   lootboxButton: { width: '100%', marginTop: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.full, backgroundColor: Colors.neonGreen, alignItems: 'center' },
